@@ -1155,3 +1155,34 @@ button, input, select, textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* BRAND & LOGO IMAGE STYLES */
+.headerLogoImg {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(245, 185, 66, 0.45));
+  transition: transform 0.25 ease;
+}
+
+.headerLogoImg:hover {
+  transform: scale(1.1);
+}
+
+.loadingLogoImg {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  margin-bottom: 16px;
+  filter: drop-shadow(0 0 20px rgba(245, 185, 66, 0.6));
+}
+
+.footerLogoImg {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-right: 6px;
+  opacity: 0.85;
+}
+

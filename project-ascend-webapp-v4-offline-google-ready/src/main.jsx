@@ -590,6 +590,7 @@ function App() {
   if (!localReady) {
     return (
       <div className="loadingShell">
+        <img src="/icon-192.png" alt="Project Ascend Logo" className="loadingLogoImg" />
         <div className="spinner"></div>
         <strong className="loadingTitle">PROJECT ASCEND</strong>
         <span className="loadingSubtitle">Initializing local vault…</span>
@@ -602,7 +603,7 @@ function App() {
       {/* HEADER BAR */}
       <header className="appHeader">
         <div className="brandGroup">
-          <Sparkles className="goldAccentIcon" size={22} />
+          <img src="/favicon-32.png" alt="Project Ascend Logo" className="headerLogoImg" />
           <div className="brandText">PROJECT <span>ASCEND</span></div>
         </div>
 
@@ -792,6 +793,7 @@ function App() {
       )}
 
       <footer className="appFooter">
+        <img src="/favicon-16.png" alt="Project Ascend Logo" className="footerLogoImg" />
         <span>PROJECT ASCEND • Offline-First Personal OS • Installable PWA</span>
       </footer>
     </div>

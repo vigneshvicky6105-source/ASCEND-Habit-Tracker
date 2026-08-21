@@ -52,3 +52,5 @@ coverage/
 
 # Antigravity / local AI tooling
 .antigravity/
+
+.vercel
