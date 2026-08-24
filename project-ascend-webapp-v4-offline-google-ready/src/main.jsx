@@ -725,7 +725,7 @@ function App() {
       <nav className="navTabs">
         {[
           { id: "dashboard", label: "Dashboard", icon: <Trophy size={16} /> },
-          { id: "quests", label: "EDIT QUESTS", icon: <Pencil size={16} /> },
+          { id: "quests", label: "Quests Center ⚔️", icon: <Swords size={16} /> },
           { id: "reading", label: "Reading Center", icon: <BookOpen size={16} /> },
           { id: "wishlist", label: "Wishlist", icon: <ShoppingCart size={16} /> },
           { id: "analytics", label: "Analytics & History", icon: <BarChart2 size={16} /> },
@@ -1215,11 +1215,11 @@ function EditQuestsView({
   onOpenConceptModal, onDeleteConcept
 }) {
   return (
-    <main className="viewContainer fade-in">
+    <div className="fade-in">
       <div className="pageHeaderRow">
         <div>
           <div className="eyebrowText"><Pencil size={13} /> TASK & CONCEPT MANAGEMENT</div>
-          <h2 className="pageTitle">EDIT QUESTS</h2>
+          <h2 className="pageTitle">MAIN QUESTS SETUP</h2>
           <p className="pageSubtitle">
             Configure quest names, categories, targets, XP rewards, and lock protection. Reorder items using the arrows.
             <br />
@@ -1346,7 +1346,7 @@ function EditQuestsView({
           ))}
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -1363,25 +1363,44 @@ function QuestsSection({
   }, [sideQuests]);
 
   return (
-    <div className="questsContainer">
-      <div className="subNavTabs">
-        <button
-          className={`subNavBtn ${subTab === "main" ? "active" : ""}`}
-          onClick={() => setSubTab("main")}
-        >
-          <Shield size={16} />
-          <span>📜 Main Quests</span>
-        </button>
-        <button
-          className={`subNavBtn ${subTab === "side" ? "active" : ""}`}
-          onClick={() => setSubTab("side")}
-        >
-          <Swords size={16} />
-          <span>⚔️ Side Quests</span>
-          {todayPendingSideCount > 0 && (
-            <span className="subBadgeCount">{todayPendingSideCount}</span>
-          )}
-        </button>
+    <main className="viewContainer fade-in">
+      {/* PROMINENT SUB-TAB NAVIGATION HEADER */}
+      <div className="questMainHeaderCard glassPanel">
+        <div className="questHeaderTopRow">
+          <div>
+            <div className="eyebrowText">
+              <Swords size={13} /> QUEST COMMAND CENTER
+            </div>
+            <h2 className="pageTitle" style={{ margin: 0 }}>
+              {subTab === "main" ? "📜 MAIN QUESTS" : "⚔️ SIDE QUESTS"}
+            </h2>
+            <p className="pageSubtitle" style={{ marginTop: 4, marginBottom: 0 }}>
+              {subTab === "main"
+                ? "Permanent daily routines, skill training targets, and locked task setups."
+                : "Temporary daily tasks, date-bound assignments, errands, meetings, and bills."}
+            </p>
+          </div>
+
+          <div className="subNavTabsProminent">
+            <button
+              className={`subNavBtnProminent ${subTab === "main" ? "active" : ""}`}
+              onClick={() => setSubTab("main")}
+            >
+              <Shield size={16} />
+              <span>📜 Main Quests</span>
+            </button>
+            <button
+              className={`subNavBtnProminent ${subTab === "side" ? "active" : ""}`}
+              onClick={() => setSubTab("side")}
+            >
+              <Swords size={16} />
+              <span>⚔️ Side Quests</span>
+              {todayPendingSideCount > 0 && (
+                <span className="subBadgeCount">{todayPendingSideCount}</span>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
 
       {subTab === "main" ? (
@@ -1403,7 +1422,7 @@ function QuestsSection({
           onDelete={onDeleteSideQuest}
         />
       )}
-    </div>
+    </main>
   );
 }
 
@@ -1437,7 +1456,7 @@ function SideQuestView({ sideQuests, toggleCompletion, onOpenModal, onDelete }) 
   });
 
   return (
-    <main className="viewContainer fade-in">
+    <div className="fade-in">
       {/* PAGE HEADER */}
       <div className="pageHeaderRow">
         <div>
@@ -1546,7 +1565,7 @@ function SideQuestView({ sideQuests, toggleCompletion, onOpenModal, onDelete }) 
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }
 

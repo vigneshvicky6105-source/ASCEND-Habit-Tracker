@@ -1505,4 +1505,58 @@ button, input, select, textarea {
   margin-top: 16px;
 }
 
+/* PROMINENT QUEST SUB-TAB HEADER */
+.questMainHeaderCard {
+  margin-bottom: 24px;
+  padding: 20px 24px;
+}
+
+.questHeaderTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.subNavTabsProminent {
+  display: flex;
+  gap: 10px;
+  background: rgba(11, 13, 20, 0.85);
+  padding: 6px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.subNavBtnProminent {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.subNavBtnProminent:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.subNavBtnProminent.active {
+  color: #0b0d14;
+  background: var(--accent-gold);
+  box-shadow: 0 0 16px rgba(245, 185, 66, 0.4);
+}
+
+.subNavBtnProminent.active .subBadgeCount {
+  background: #0b0d14;
+  color: var(--accent-gold);
+}
+
 
