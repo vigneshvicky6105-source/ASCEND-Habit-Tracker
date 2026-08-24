@@ -5,7 +5,7 @@ import {
   Check, Flame, Plus, Settings, BookOpen, LogIn, LogOut, WifiOff, Cloud,
   Pencil, Trash2, ArrowUp, ArrowDown, Lock, Unlock, Calendar, Trophy,
   BarChart2, Sparkles, X, ChevronRight, RefreshCw, ShoppingCart, Target,
-  Layers, CheckCircle2, Circle
+  Layers, CheckCircle2, Circle, Swords, Shield, Clock, CalendarDays
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart,
@@ -46,8 +46,8 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
 
 // --- INDEXEDDB MULTI-USER ISOLATED STORAGE ---
 const DB_NAME = "project_ascend_v4_db";
-const DB_VERSION = 1;
-const STORES = ["tasks", "completions", "books", "wishlist", "concepts"];
+const DB_VERSION = 2;
+const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests"];
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -103,7 +103,8 @@ function useUserLocalState(user) {
     completions: {}, // map key -> true ("taskId:YYYY-MM-DD")
     books: [],
     wishlist: [],
-    concepts: []
+    concepts: [],
+    side_quests: []
   });
   const [ready, setReady] = useState(false);
 
@@ -114,7 +115,7 @@ function useUserLocalState(user) {
 
     async function load() {
       try {
-        const [tasks, completionsArr, books, wishlist, concepts] = await Promise.all(
+        const [tasks, completionsArr, books, wishlist, concepts, sideQuestsArr] = await Promise.all(
           STORES.map(s => idbGetUserRecords(s, userId))
         );
         if (!active) return;
@@ -157,7 +158,8 @@ function useUserLocalState(user) {
           completions: completionsMap,
           books,
           wishlist,
-          concepts: finalConcepts
+          concepts: finalConcepts,
+          side_quests: sideQuestsArr || []
         });
         setReady(true);
       } catch (err) {
@@ -187,7 +189,8 @@ function useUserLocalState(user) {
           ),
           idbSaveUserRecords("books", state.books, userId),
           idbSaveUserRecords("wishlist", state.wishlist, userId),
-          idbSaveUserRecords("concepts", state.concepts, userId)
+          idbSaveUserRecords("concepts", state.concepts, userId),
+          idbSaveUserRecords("side_quests", state.side_quests || [], userId)
         ]);
       } catch (e) {
         console.error("Error saving state to IndexedDB:", e);
@@ -211,6 +214,8 @@ function App() {
   const [bookModal, setBookModal] = useState(null); // null | { isNew: bool, book: obj }
   const [wishlistModal, setWishlistModal] = useState(null); // null | { isNew: bool, item: obj }
   const [conceptModal, setConceptModal] = useState(null); // null | { isNew: bool, concept: obj }
+  const [sideQuestModal, setSideQuestModal] = useState(null); // null | { isNew: bool, quest?: obj, defaultDate?: string }
+  const [questSubTab, setQuestSubTab] = useState("main"); // "main" | "side"
 
   const [local, setLocal, localReady, userId] = useUserLocalState(user);
 
@@ -322,6 +327,32 @@ function App() {
           }))
         );
       }
+
+      // 5. Side Quests Sync
+      if (local.side_quests && local.side_quests.length > 0) {
+        const { data: cloudSideQuests } = await supabase.from("side_quests").select("*").eq("user_id", uid);
+        if (cloudSideQuests && cloudSideQuests.length > 0) {
+          const sqMap = new Map();
+          local.side_quests.forEach(sq => sqMap.set(sq.id, sq));
+          cloudSideQuests.forEach(csq => sqMap.set(csq.id, csq));
+          setLocal(s => ({ ...s, side_quests: Array.from(sqMap.values()) }));
+        }
+        await supabase.from("side_quests").upsert(
+          local.side_quests.map(sq => ({
+            id: (sq.id && !sq.id.startsWith("sq-")) ? sq.id : undefined,
+            user_id: uid,
+            title: sq.title,
+            description: sq.description || "",
+            date: sq.date || todayStr(),
+            priority: sq.priority || "Medium",
+            due_time: sq.due_time || "",
+            category: sq.category || "General",
+            completed: !!sq.completed,
+            created_at: sq.created_at || new Date().toISOString(),
+            completed_at: sq.completed_at || null
+          }))
+        );
+      }
     } catch (err) {
       console.warn("Cloud sync deferred:", err);
     } finally {
@@ -335,7 +366,7 @@ function App() {
       const timer = setTimeout(() => syncWithCloud(), 3000);
       return () => clearTimeout(timer);
     }
-  }, [user, online, localReady, local.tasks, local.completions, local.books, local.wishlist]);
+  }, [user, online, localReady, local.tasks, local.completions, local.books, local.wishlist, local.side_quests]);
 
   // Auth Handlers
   async function handleGoogleLogin() {
@@ -483,6 +514,60 @@ function App() {
     }
   };
 
+  // --- SIDE QUEST ACTIONS ---
+  const saveSideQuestModal = (sqData) => {
+    if (sqData.isNew) {
+      const newSq = {
+        id: crypto.randomUUID(),
+        user_id: userId,
+        title: sqData.title,
+        description: sqData.description || "",
+        date: sqData.date || todayStr(),
+        priority: sqData.priority || "Medium",
+        due_time: sqData.due_time || "",
+        category: sqData.category || "General",
+        completed: false,
+        created_at: new Date().toISOString(),
+        completed_at: null
+      };
+      setLocal(s => ({ ...s, side_quests: [...(s.side_quests || []), newSq] }));
+    } else {
+      setLocal(s => ({
+        ...s,
+        side_quests: (s.side_quests || []).map(sq =>
+          sq.id === sqData.id ? { ...sq, ...sqData } : sq
+        )
+      }));
+    }
+    setSideQuestModal(null);
+  };
+
+  const toggleSideQuestCompletion = (sqId) => {
+    setLocal(s => ({
+      ...s,
+      side_quests: (s.side_quests || []).map(sq => {
+        if (sq.id === sqId) {
+          const nextState = !sq.completed;
+          return {
+            ...sq,
+            completed: nextState,
+            completed_at: nextState ? new Date().toISOString() : null
+          };
+        }
+        return sq;
+      })
+    }));
+  };
+
+  const deleteSideQuest = (sqId) => {
+    if (confirm("Are you sure you want to delete this Side Quest?")) {
+      setLocal(s => ({
+        ...s,
+        side_quests: (s.side_quests || []).filter(sq => sq.id !== sqId)
+      }));
+    }
+  };
+
   // --- QUICK LOG 10 PAGES READING ACTION ---
   const logReadingTenPages = () => {
     const activeBook = local.books.find(b => b.status === "Reading") || local.books[0];
@@ -536,8 +621,15 @@ function App() {
         total += task ? (task.xp || 10) : 10;
       }
     });
+    // Side Quests XP (+10 Low, +20 Medium, +30 High)
+    (local.side_quests || []).forEach(sq => {
+      if (sq.completed) {
+        const xp = sq.priority === "High" ? 30 : sq.priority === "Medium" ? 20 : 10;
+        total += xp;
+      }
+    });
     return total;
-  }, [local.completions, local.tasks]);
+  }, [local.completions, local.tasks, local.side_quests]);
 
   const currentLevel = Math.floor(totalXpAllTime / 100) + 1;
   const levelProgress = totalXpAllTime % 100;
@@ -666,11 +758,17 @@ function App() {
           streakStats={streakStats}
           logReadingTenPages={logReadingTenPages}
           onNavigate={setTab}
+          sideQuests={local.side_quests || []}
+          toggleSideQuestCompletion={toggleSideQuestCompletion}
+          onOpenSideQuestModal={setSideQuestModal}
+          onNavigateToSideQuests={() => { setTab("quests"); setQuestSubTab("side"); }}
         />
       )}
 
       {tab === "quests" && (
-        <EditQuestsView
+        <QuestsSection
+          subTab={questSubTab}
+          setSubTab={setQuestSubTab}
           tasks={activeTasks}
           concepts={local.concepts}
           toggleLock={toggleTaskLock}
@@ -679,6 +777,10 @@ function App() {
           onDeleteQuest={deleteTask}
           onOpenConceptModal={setConceptModal}
           onDeleteConcept={deleteConcept}
+          sideQuests={local.side_quests || []}
+          toggleSideQuestCompletion={toggleSideQuestCompletion}
+          onOpenSideQuestModal={setSideQuestModal}
+          onDeleteSideQuest={deleteSideQuest}
         />
       )}
 
@@ -723,6 +825,14 @@ function App() {
           modalData={questModal}
           onClose={() => setQuestModal(null)}
           onSave={saveQuestModal}
+        />
+      )}
+
+      {sideQuestModal && (
+        <SideQuestModal
+          modalData={sideQuestModal}
+          onClose={() => setSideQuestModal(null)}
+          onSave={saveSideQuestModal}
         />
       )}
 
@@ -805,13 +915,20 @@ function App() {
 // ==========================================
 function DashboardView({
   tasks, local, toggleCompletion, toggleLock, completionPct, todayCompletionsCount,
-  todayXp, currentLevel, levelProgress, totalXpAllTime, streakStats, logReadingTenPages, onNavigate
+  todayXp, currentLevel, levelProgress, totalXpAllTime, streakStats, logReadingTenPages,
+  onNavigate, sideQuests, toggleSideQuestCompletion, onOpenSideQuestModal, onNavigateToSideQuests
 }) {
   const formattedDate = new Date().toLocaleDateString(undefined, {
     weekday: "long", day: "numeric", month: "long", year: "numeric"
   });
 
   const activeBook = local.books.find(b => b.status === "Reading") || local.books[0];
+
+  const todaySideQuests = useMemo(() => {
+    return (sideQuests || []).filter(sq => sq.date === todayStr());
+  }, [sideQuests]);
+
+  const todaySideQuestsDone = todaySideQuests.filter(sq => sq.completed).length;
 
   return (
     <main className="viewContainer fade-in">
@@ -893,7 +1010,8 @@ function DashboardView({
 
       {/* MAIN TWO COLUMN GRID */}
       <section className="dashboardGrid">
-        {/* MAIN QUESTS PANEL */}
+        <div className="dashboardMainCol">
+          {/* MAIN QUESTS PANEL */}
         <div className="glassPanel">
           <div className="panelHeader">
             <div>
@@ -955,6 +1073,74 @@ function DashboardView({
             )}
           </div>
         </div>
+
+        {/* TODAY'S SIDE QUESTS PANEL */}
+        <div className="glassPanel marginTop">
+          <div className="panelHeader">
+            <div>
+              <h3>⚔️ TODAY'S SIDE QUESTS</h3>
+              <span className="panelSub">Temporary daily tasks & errands</span>
+            </div>
+            <div className="panelHeaderActions">
+              <span className="statusCountTag">
+                {todaySideQuestsDone}/{todaySideQuests.length} DONE
+              </span>
+              <button className="linkBtn" onClick={() => onNavigateToSideQuests()}>
+                Side Quests <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+
+          {todaySideQuests.length === 0 ? (
+            <div className="dashboardEmptyState">
+              <span className="dimText">No side quests added for today yet.</span>
+              <button
+                className="secondaryBtn smallBtn"
+                onClick={() => onOpenSideQuestModal({ isNew: true, defaultDate: todayStr() })}
+              >
+                <Plus size={14} />
+                <span>+ Add Side Quest</span>
+              </button>
+            </div>
+          ) : (
+            <div className="questList">
+              {todaySideQuests.map((quest) => (
+                <div key={quest.id} className={`questItem ${quest.completed ? "completed" : ""}`}>
+                  <button
+                    className={`checkControl ${quest.completed ? "checked" : ""}`}
+                    onClick={() => toggleSideQuestCompletion(quest.id)}
+                    title={quest.completed ? "Mark incomplete" : "Mark complete"}
+                  >
+                    {quest.completed && <Check size={18} strokeWidth={3} />}
+                  </button>
+                  <div className="questContent">
+                    <div className="questTitleRow">
+                      <strong className="questTitle">{quest.title}</strong>
+                      <span className={`priorityBadge small ${quest.priority.toLowerCase()}`}>
+                        {quest.priority === "High" ? "🔥 High" : quest.priority === "Low" ? "🌱 Low" : "⚡ Med"}
+                      </span>
+                    </div>
+                    {quest.description && <p className="questDescText">{quest.description}</p>}
+                    <div className="questMeta">
+                      {quest.category && <span className="catTag">{quest.category}</span>}
+                      {quest.due_time && (
+                        <span className="targetTag">
+                          <Clock size={12} /> {quest.due_time}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="questRight">
+                    <span className="xpBadge">
+                      +{quest.priority === "High" ? 30 : quest.priority === "Medium" ? 20 : 10} XP
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
         {/* SIDE PANELS COLUMN */}
         <div className="dashboardSideCol">
@@ -1161,6 +1347,390 @@ function EditQuestsView({
         </div>
       </div>
     </main>
+  );
+}
+
+// ==========================================
+// QUESTS SECTION (WRAPPER FOR MAIN & SIDE QUESTS)
+// ==========================================
+function QuestsSection({
+  subTab, setSubTab, tasks, concepts, toggleLock, moveOrder, onOpenQuestModal,
+  onDeleteQuest, onOpenConceptModal, onDeleteConcept, sideQuests,
+  toggleSideQuestCompletion, onOpenSideQuestModal, onDeleteSideQuest
+}) {
+  const todayPendingSideCount = useMemo(() => {
+    return (sideQuests || []).filter(sq => sq.date === todayStr() && !sq.completed).length;
+  }, [sideQuests]);
+
+  return (
+    <div className="questsContainer">
+      <div className="subNavTabs">
+        <button
+          className={`subNavBtn ${subTab === "main" ? "active" : ""}`}
+          onClick={() => setSubTab("main")}
+        >
+          <Shield size={16} />
+          <span>📜 Main Quests</span>
+        </button>
+        <button
+          className={`subNavBtn ${subTab === "side" ? "active" : ""}`}
+          onClick={() => setSubTab("side")}
+        >
+          <Swords size={16} />
+          <span>⚔️ Side Quests</span>
+          {todayPendingSideCount > 0 && (
+            <span className="subBadgeCount">{todayPendingSideCount}</span>
+          )}
+        </button>
+      </div>
+
+      {subTab === "main" ? (
+        <EditQuestsView
+          tasks={tasks}
+          concepts={concepts}
+          toggleLock={toggleLock}
+          moveOrder={moveOrder}
+          onOpenQuestModal={onOpenQuestModal}
+          onDeleteQuest={onDeleteQuest}
+          onOpenConceptModal={onOpenConceptModal}
+          onDeleteConcept={onDeleteConcept}
+        />
+      ) : (
+        <SideQuestView
+          sideQuests={sideQuests}
+          toggleCompletion={toggleSideQuestCompletion}
+          onOpenModal={onOpenSideQuestModal}
+          onDelete={onDeleteSideQuest}
+        />
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// SIDE QUEST VIEW COMPONENT
+// ==========================================
+function SideQuestView({ sideQuests, toggleCompletion, onOpenModal, onDelete }) {
+  const [selectedDate, setSelectedDate] = useState(todayStr());
+
+  const changeDate = (days) => {
+    const d = new Date(selectedDate + "T00:00:00");
+    d.setDate(d.getDate() + days);
+    setSelectedDate(d.toISOString().slice(0, 10));
+  };
+
+  const dateQuests = useMemo(() => {
+    return (sideQuests || []).filter(sq => sq.date === selectedDate);
+  }, [sideQuests, selectedDate]);
+
+  const stats = useMemo(() => {
+    const total = dateQuests.length;
+    const completed = dateQuests.filter(sq => sq.completed).length;
+    const remaining = total - completed;
+    const highPriority = dateQuests.filter(sq => sq.priority === "High" && !sq.completed).length;
+    return { total, completed, remaining, highPriority };
+  }, [dateQuests]);
+
+  const isToday = selectedDate === todayStr();
+  const formattedDateHeader = new Date(selectedDate + "T00:00:00").toLocaleDateString(undefined, {
+    weekday: "short", month: "short", day: "numeric", year: "numeric"
+  });
+
+  return (
+    <main className="viewContainer fade-in">
+      {/* PAGE HEADER */}
+      <div className="pageHeaderRow">
+        <div>
+          <div className="eyebrowText">
+            <Swords size={13} /> TEMPORARY DAILY TASKS
+          </div>
+          <h2 className="pageTitle">⚔️ Side Quests</h2>
+          <p className="pageSubtitle">
+            Manage day-specific tasks, assignments, meetings, and errands without cluttering your permanent Main Quest routine.
+          </p>
+        </div>
+        <button
+          className="primaryBtn"
+          onClick={() => onOpenModal({ isNew: true, defaultDate: selectedDate })}
+        >
+          <Plus size={16} />
+          <span>Add Side Quest</span>
+        </button>
+      </div>
+
+      {/* DATE NAVIGATION BAR */}
+      <div className="dateNavCard glassPanel">
+        <button className="secondaryBtn smallBtn" onClick={() => changeDate(-1)}>
+          ← Previous Day
+        </button>
+        <div className="dateCenterGroup">
+          <button
+            className={`todayBadgeBtn ${isToday ? "active" : ""}`}
+            onClick={() => setSelectedDate(todayStr())}
+          >
+            Today
+          </button>
+          <span className="selectedDateText">{formattedDateHeader}</span>
+          <input
+            type="date"
+            className="datePickerInput"
+            value={selectedDate}
+            onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+          />
+        </div>
+        <button className="secondaryBtn smallBtn" onClick={() => changeDate(1)}>
+          Next Day →
+        </button>
+      </div>
+
+      {/* STATS SUMMARY GRID */}
+      <div className="sideQuestStatsGrid">
+        <div className="statItemCard">
+          <strong>{stats.total}</strong>
+          <small>Total Tasks</small>
+        </div>
+        <div className="statItemCard success">
+          <strong>{stats.completed}</strong>
+          <small>Completed</small>
+        </div>
+        <div className="statItemCard warning">
+          <strong>{stats.remaining}</strong>
+          <small>Remaining</small>
+        </div>
+        <div className="statItemCard danger">
+          <strong>{stats.highPriority}</strong>
+          <small>High Priority</small>
+        </div>
+      </div>
+
+      {/* SIDE QUESTS LIST PANEL */}
+      <div className="glassPanel">
+        <div className="panelHeader">
+          <div>
+            <h3>{isToday ? "TODAY'S SIDE QUESTS" : `SIDE QUESTS (${formattedDateHeader})`}</h3>
+            <span className="panelSub">
+              {stats.total === 0
+                ? "No tasks scheduled for this day"
+                : `${stats.completed} of ${stats.total} completed`}
+            </span>
+          </div>
+          <span className="statusCountTag">
+            {stats.remaining === 0 && stats.total > 0 ? "ALL CLEAR ⚔️" : `${stats.remaining} REMAINING`}
+          </span>
+        </div>
+
+        {dateQuests.length === 0 ? (
+          <div className="emptyQuestState">
+            <div className="emptyIconVisual">⚔️</div>
+            <h4>⚔️ No Side Quests {isToday ? "Today" : "For This Date"}</h4>
+            <p>"Your battlefield is clear. Add a temporary quest when something unexpected comes up."</p>
+            <button
+              className="primaryBtn"
+              onClick={() => onOpenModal({ isNew: true, defaultDate: selectedDate })}
+            >
+              <Plus size={16} />
+              <span>+ Add Side Quest</span>
+            </button>
+          </div>
+        ) : (
+          <div className="sideQuestList">
+            {dateQuests.map((quest) => (
+              <SideQuestCard
+                key={quest.id}
+                quest={quest}
+                toggleCompletion={toggleCompletion}
+                onEdit={(q) => onOpenModal({ isNew: false, quest: q })}
+                onDelete={onDelete}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
+
+// ==========================================
+// SIDE QUEST CARD COMPONENT
+// ==========================================
+function SideQuestCard({ quest, toggleCompletion, onEdit, onDelete }) {
+  const getPriorityBadge = (p) => {
+    if (p === "High") return <span className="priorityBadge high">🔥 High (+30 XP)</span>;
+    if (p === "Low") return <span className="priorityBadge low">🌱 Low (+10 XP)</span>;
+    return <span className="priorityBadge medium">⚡ Medium (+20 XP)</span>;
+  };
+
+  return (
+    <div className={`sideQuestCard ${quest.completed ? "completed" : ""}`}>
+      <button
+        className={`checkControl ${quest.completed ? "checked" : ""}`}
+        onClick={() => toggleCompletion(quest.id)}
+        title={quest.completed ? "Mark pending" : "Mark completed"}
+      >
+        {quest.completed && <Check size={18} strokeWidth={3} />}
+      </button>
+
+      <div className="sideQuestBody">
+        <div className="titleRow">
+          <strong className="questTitle">{quest.title}</strong>
+          {getPriorityBadge(quest.priority)}
+        </div>
+
+        {quest.description && (
+          <p className="questDescription">{quest.description}</p>
+        )}
+
+        <div className="questMetaRow">
+          {quest.category && <span className="catTag">{quest.category}</span>}
+          {quest.due_time && (
+            <span className="dueTag">
+              <Clock size={12} />
+              <span>Due {quest.due_time}</span>
+            </span>
+          )}
+          {quest.completed && quest.completed_at && (
+            <span className="completedTimeTag">
+              ✓ Done at {new Date(quest.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="cardActions">
+        <button className="iconBtn small" onClick={() => onEdit(quest)} title="Edit quest">
+          <Pencil size={14} />
+        </button>
+        <button className="iconBtn small dangerHover" onClick={() => onDelete(quest.id)} title="Delete quest">
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// SIDE QUEST MODAL COMPONENT
+// ==========================================
+function SideQuestModal({ modalData, onClose, onSave }) {
+  const isNew = modalData.isNew;
+  const quest = modalData.quest || {};
+
+  const [title, setTitle] = useState(quest.title || "");
+  const [description, setDescription] = useState(quest.description || "");
+  const [date, setDate] = useState(quest.date || modalData.defaultDate || todayStr());
+  const [priority, setPriority] = useState(quest.priority || "Medium");
+  const [dueTime, setDueTime] = useState(quest.due_time || "");
+  const [category, setCategory] = useState(quest.category || "General");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title.trim()) {
+      alert("Please enter a quest title.");
+      return;
+    }
+    onSave({
+      id: quest.id,
+      isNew,
+      title: title.trim(),
+      description: description.trim(),
+      date,
+      priority,
+      due_time: dueTime,
+      category: category.trim() || "General"
+    });
+  };
+
+  return (
+    <div className="modalBackdrop fade-in">
+      <div className="modalCard glassPanel">
+        <div className="modalHeader">
+          <h3>{isNew ? "⚔️ ADD NEW SIDE QUEST" : "✏️ EDIT SIDE QUEST"}</h3>
+          <button className="iconBtn small" onClick={onClose}><X size={16} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="modalForm">
+          <div className="formGroup">
+            <label>Quest Title *</label>
+            <input
+              type="text"
+              placeholder="e.g. Submit assignment today, Call HR, Pay bill..."
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              autoFocus
+              required
+            />
+          </div>
+
+          <div className="formGroup">
+            <label>Description (Optional)</label>
+            <textarea
+              placeholder="Additional details or instructions..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+            />
+          </div>
+
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Date *</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="formGroup">
+              <label>Due Time (Optional)</label>
+              <input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Priority</label>
+              <div className="prioritySelectGroup">
+                {["Low", "Medium", "High"].map((p) => (
+                  <button
+                    type="button"
+                    key={p}
+                    className={`priorityOptionBtn ${p.toLowerCase()} ${priority === p ? "selected" : ""}`}
+                    onClick={() => setPriority(p)}
+                  >
+                    {p === "High" ? "🔥 High" : p === "Low" ? "🌱 Low" : "⚡ Medium"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="formGroup">
+              <label>Category / Tag</label>
+              <input
+                type="text"
+                placeholder="e.g. College, Admin, Personal..."
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="modalFooterActions">
+            <button type="button" className="secondaryBtn" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="primaryBtn">
+              {isNew ? "+ Create Side Quest" : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 

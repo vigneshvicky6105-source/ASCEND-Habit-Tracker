@@ -1186,3 +1186,323 @@ button, input, select, textarea {
   opacity: 0.85;
 }
 
+/* ==========================================
+   SIDE QUEST SYSTEM STYLES
+   ========================================== */
+
+/* SUB NAVIGATION TABS */
+.subNavTabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  background: var(--bg-card);
+  padding: 6px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  width: fit-content;
+}
+
+.subNavBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.subNavBtn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.subNavBtn.active {
+  color: #0b0d14;
+  background: var(--accent-gold);
+}
+
+.subBadgeCount {
+  background: rgba(11, 13, 20, 0.8);
+  color: var(--accent-gold);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+.subNavBtn.active .subBadgeCount {
+  background: #0b0d14;
+  color: var(--accent-gold);
+}
+
+/* DATE NAVIGATION CARD */
+.dateNavCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  margin-bottom: 20px;
+  gap: 12px;
+}
+
+.dateCenterGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-input);
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.todayBadgeBtn {
+  background: rgba(245, 185, 66, 0.15);
+  color: var(--accent-gold);
+  border: 1px solid rgba(245, 185, 66, 0.3);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.todayBadgeBtn:hover {
+  background: var(--accent-gold);
+  color: #0b0d14;
+}
+
+.selectedDateText {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--text-main);
+}
+
+.datePickerInput {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* SIDE QUEST STATS GRID */
+.sideQuestStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.statItemCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  text-align: center;
+}
+
+.statItemCard strong {
+  display: block;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text-main);
+}
+
+.statItemCard small {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.statItemCard.success strong { color: var(--color-success); }
+.statItemCard.warning strong { color: var(--accent-gold); }
+.statItemCard.danger strong { color: var(--color-danger); }
+
+/* SIDE QUEST CARDS & LIST */
+.sideQuestList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sideQuestCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: rgba(14, 17, 26, 0.85);
+  transition: all 0.2s ease;
+}
+
+.sideQuestCard.completed {
+  opacity: 0.65;
+  background: rgba(14, 17, 26, 0.4);
+}
+
+.sideQuestCard.completed .questTitle {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.sideQuestBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.questDescription {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.questMetaRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.dueTag {
+  font-size: 11px;
+  color: var(--accent-gold);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(245, 185, 66, 0.1);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.completedTimeTag {
+  font-size: 11px;
+  color: var(--color-success);
+}
+
+/* PRIORITY BADGES */
+.priorityBadge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.priorityBadge.high {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.priorityBadge.medium {
+  background: rgba(245, 185, 66, 0.2);
+  color: var(--accent-gold);
+  border: 1px solid rgba(245, 185, 66, 0.3);
+}
+
+.priorityBadge.low {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.priorityBadge.small {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+
+/* PRIORITY SELECTOR BUTTONS IN MODAL */
+.prioritySelectGroup {
+  display: flex;
+  gap: 8px;
+}
+
+.priorityOptionBtn {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.priorityOptionBtn.low.selected {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border-color: #3b82f6;
+}
+
+.priorityOptionBtn.medium.selected {
+  background: rgba(245, 185, 66, 0.2);
+  color: var(--accent-gold);
+  border-color: var(--accent-gold);
+}
+
+.priorityOptionBtn.high.selected {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border-color: #ef4444;
+}
+
+/* EMPTY QUEST STATE */
+.emptyQuestState {
+  text-align: center;
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.emptyIconVisual {
+  font-size: 44px;
+}
+
+.emptyQuestState h4 {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.emptyQuestState p {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 420px;
+  font-style: italic;
+  margin-bottom: 8px;
+}
+
+.dashboardEmptyState {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px;
+  background: rgba(14, 17, 26, 0.4);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+
+.modalFooterActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+

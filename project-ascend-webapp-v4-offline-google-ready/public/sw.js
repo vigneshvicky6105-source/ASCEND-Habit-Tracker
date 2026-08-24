@@ -1,8 +1,13 @@
-const CACHE_NAME = "ascend-pwa-v4";
+const CACHE_NAME = "ascend-pwa-v5";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
-  "/manifest.webmanifest"
+  "/manifest.webmanifest",
+  "/favicon-32.png",
+  "/favicon-16.png",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/logo.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -30,7 +35,6 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Fetch background refresh if online
         fetch(event.request)
           .then((networkResponse) => {
             if (networkResponse.status === 200) {

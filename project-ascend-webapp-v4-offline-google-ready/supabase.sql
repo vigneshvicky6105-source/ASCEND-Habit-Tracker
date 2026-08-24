@@ -72,6 +72,21 @@ create table if not exists public.profile_settings (
   updated_at timestamptz not null default now()
 );
 
+-- 7. Side Quests (Temporary Date-Bound Tasks)
+create table if not exists public.side_quests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  title text not null,
+  description text default '',
+  date date not null default CURRENT_DATE,
+  priority text default 'Medium',
+  due_time text default '',
+  category text default 'General',
+  completed boolean not null default false,
+  created_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
 -- Enable Row Level Security (RLS) on all tables
 alter table public.tasks enable row level security;
 alter table public.task_completions enable row level security;
@@ -79,6 +94,7 @@ alter table public.books enable row level security;
 alter table public.wishlist enable row level security;
 alter table public.core_concepts enable row level security;
 alter table public.profile_settings enable row level security;
+alter table public.side_quests enable row level security;
 
 -- Row Level Security Policies (Users can only access their own data)
 drop policy if exists "tasks own" on public.tasks;
@@ -98,6 +114,9 @@ create policy "core_concepts own" on public.core_concepts for all using (auth.ui
 
 drop policy if exists "settings own" on public.profile_settings;
 create policy "settings own" on public.profile_settings for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "side_quests own" on public.side_quests;
+create policy "side_quests own" on public.side_quests for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Migration safety helpers for existing tables
 alter table public.tasks add column if not exists locked boolean not null default false;
