@@ -217,6 +217,13 @@ function App() {
   const [conceptModal, setConceptModal] = useState(null); // null | { isNew: bool, concept: obj }
   const [sideQuestModal, setSideQuestModal] = useState(null); // null | { isNew: bool, quest?: obj, defaultDate?: string }
   const [questSubTab, setQuestSubTab] = useState("main"); // "main" | "side"
+  const [notifPermission, setNotifPermission] = useState(() => {
+    try {
+      return (typeof window !== "undefined" && "Notification" in window) ? Notification.permission : "default";
+    } catch (e) {
+      return "default";
+    }
+  });
 
   const [local, setLocal, localReady, userId] = useUserLocalState(user);
 
