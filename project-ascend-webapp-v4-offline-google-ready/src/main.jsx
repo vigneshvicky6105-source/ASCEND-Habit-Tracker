@@ -896,14 +896,14 @@ function App() {
         {[
           { id: "dashboard", label: "Dashboard", icon: <Trophy size={16} /> },
           { id: "quests", label: "Quests Center ⚔️", icon: <Swords size={16} /> },
+          { id: "reading", label: "Reading Center", icon: <BookOpen size={16} /> },
+          { id: "wishlist", label: "Wishlist", icon: <ShoppingCart size={16} /> },
+          { id: "analytics", label: "Analytics & Insights", icon: <BarChart2 size={16} /> },
+          { id: "ai", label: "Ascend AI 🤖", icon: <Sparkles size={16} /> },
           { id: "history", label: "Quest History 📜", icon: <CalendarDays size={16} /> },
           { id: "achievements", label: "Achievements 🏆", icon: <Trophy size={16} /> },
           { id: "ascension", label: "Ascension 🗺️", icon: <Target size={16} /> },
           { id: "challenges", label: "Challenges 🎯", icon: <Shield size={16} /> },
-          { id: "ai", label: "Ascend AI 🤖", icon: <Sparkles size={16} /> },
-          { id: "reading", label: "Reading Center", icon: <BookOpen size={16} /> },
-          { id: "wishlist", label: "Wishlist", icon: <ShoppingCart size={16} /> },
-          { id: "analytics", label: "Analytics & Insights", icon: <BarChart2 size={16} /> },
           { id: "settings", label: "Settings", icon: <Settings size={16} /> }
         ].map(t => (
           <button
