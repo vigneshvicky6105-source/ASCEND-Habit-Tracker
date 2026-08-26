@@ -43,6 +43,7 @@ const STARTER_CONCEPTS = [
 ];
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
+const PRIORITY_ORDER = { "High": 1, "Medium": 2, "Low": 3 };
 
 // --- INDEXEDDB MULTI-USER ISOLATED STORAGE ---
 const DB_NAME = "project_ascend_v4_db";
@@ -1012,7 +1013,17 @@ function DashboardView({
   const activeBook = local.books.find(b => b.status === "Reading") || local.books[0];
 
   const todaySideQuests = useMemo(() => {
-    return (sideQuests || []).filter(sq => sq.date === todayStr());
+    const filtered = (sideQuests || []).filter(sq => sq.date === todayStr());
+    return [...filtered].sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      const pA = PRIORITY_ORDER[a.priority] || 2;
+      const pB = PRIORITY_ORDER[b.priority] || 2;
+      if (pA !== pB) return pA - pB;
+      if (a.due_time && b.due_time) return a.due_time.localeCompare(b.due_time);
+      if (a.due_time) return -1;
+      if (b.due_time) return 1;
+      return 0;
+    });
   }, [sideQuests]);
 
   const todaySideQuestsDone = todaySideQuests.filter(sq => sq.completed).length;
@@ -1529,7 +1540,17 @@ function SideQuestView({ sideQuests, toggleCompletion, onOpenModal, onDelete, no
   };
 
   const dateQuests = useMemo(() => {
-    return (sideQuests || []).filter(sq => sq.date === selectedDate);
+    const filtered = (sideQuests || []).filter(sq => sq.date === selectedDate);
+    return [...filtered].sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      const pA = PRIORITY_ORDER[a.priority] || 2;
+      const pB = PRIORITY_ORDER[b.priority] || 2;
+      if (pA !== pB) return pA - pB;
+      if (a.due_time && b.due_time) return a.due_time.localeCompare(b.due_time);
+      if (a.due_time) return -1;
+      if (b.due_time) return 1;
+      return 0;
+    });
   }, [sideQuests, selectedDate]);
 
   const stats = useMemo(() => {
