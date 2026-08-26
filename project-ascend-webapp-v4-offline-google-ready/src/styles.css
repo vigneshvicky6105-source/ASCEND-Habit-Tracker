@@ -1774,4 +1774,362 @@ button, input, select, textarea {
   40% { transform: scale(1); opacity: 1; }
 }
 
+/* RPG DUAL PROGRESS & TODAY'S FOCUS */
+.dualProgressRow {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.miniProgGroup {
+  flex: 1;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.miniProgGroup small {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.miniProgGroup span {
+  font-size: 11px;
+  color: var(--accent-gold);
+  font-weight: 800;
+  text-align: right;
+}
+
+.focusInputRow {
+  display: flex;
+  gap: 10px;
+}
+
+.focusInput {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  padding: 10px 14px;
+  font-size: 14px;
+  outline: none;
+}
+
+.focusInput:focus {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 10px rgba(245, 185, 66, 0.2);
+}
+
+/* WEEKLY REPORT & INSIGHTS */
+.weeklyReportGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.wCard {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wCard strong {
+  font-size: 16px;
+  color: var(--accent-gold);
+}
+
+.wCard small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.weeklyAdviceBox {
+  background: rgba(245, 185, 66, 0.08);
+  border: 1px solid rgba(245, 185, 66, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.insightsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.insightItem {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+/* HISTORY TABLE */
+.filterPillsRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filterPillBtn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filterPillBtn.active, .filterPillBtn:hover {
+  background: var(--accent-gold);
+  color: #0b0d14;
+  border-color: var(--accent-gold);
+}
+
+.historyTable {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.historyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.historyRow.done {
+  border-left: 3px solid #48bb78;
+}
+
+.historyRow.missed {
+  border-left: 3px solid #e53e3e;
+}
+
+.historyColDate {
+  font-size: 13px;
+  color: var(--accent-gold);
+  min-width: 100px;
+}
+
+.historyColTitle {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.historyTags {
+  display: flex;
+  gap: 6px;
+}
+
+.typeTag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.typeTag.main { background: rgba(245, 185, 66, 0.15); color: var(--accent-gold); }
+.typeTag.side { background: rgba(72, 187, 120, 0.15); color: #48bb78; }
+
+.prioTag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+}
+
+.statusTag {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.statusTag.success { color: #48bb78; }
+.statusTag.danger { color: #e53e3e; }
+.statusTag.warning { color: #f5b942; }
+
+.failedGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ACHIEVEMENTS GRID */
+.achievementsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.achievementCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.achievementCard.unlocked {
+  border-color: rgba(245, 185, 66, 0.5);
+  box-shadow: 0 0 16px rgba(245, 185, 66, 0.15);
+}
+
+.achHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.achHead h3 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.achDesc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.achProgressRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.achBar {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.achFill {
+  height: 100%;
+  background: var(--accent-gold);
+  border-radius: 4px;
+}
+
+.achNum {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+/* ASCENSION JOURNEY TREE */
+.journeyTree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 30px 20px;
+}
+
+.journeyStepCard {
+  width: 100%;
+  max-width: 450px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  text-align: center;
+  position: relative;
+  transition: all 0.25s ease;
+}
+
+.journeyStepCard.current {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 20px rgba(245, 185, 66, 0.3);
+  background: rgba(245, 185, 66, 0.08);
+}
+
+.journeyStepCard.reached {
+  border-color: rgba(72, 187, 120, 0.4);
+}
+
+.stepRankTitle {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text-main);
+}
+
+.stepLevelTag {
+  font-size: 11px;
+  color: var(--accent-gold);
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.stepDesc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 6px 0 0 0;
+}
+
+.currentBadge {
+  position: absolute;
+  top: -10px;
+  right: 16px;
+  background: var(--accent-gold);
+  color: #0b0d14;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.journeyConnector {
+  font-size: 20px;
+  color: var(--text-muted);
+}
+
+.journeyConnector.reached {
+  color: var(--accent-gold);
+}
+
+/* CHALLENGES GRID */
+.challengesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.challengeCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.chHead h3 {
+  font-size: 15px;
+  margin: 4px 0 0 0;
+}
+
 

@@ -42,13 +42,29 @@ const STARTER_CONCEPTS = [
   { title: "Web Development", subtitle: "Daily learning target" }
 ];
 
+const STARTER_CHALLENGES = [
+  { id: "ch-1", title: "30-Day Coding Challenge", category: "Coding", targetDays: 30, completedDays: 12, rewardXp: 500, active: true },
+  { id: "ch-2", title: "Read 10 Pages Daily for 30 Days", category: "Reading", targetDays: 30, completedDays: 8, rewardXp: 300, active: true },
+  { id: "ch-3", title: "Apply to 30 Tech Jobs", category: "Career", targetDays: 30, completedDays: 15, rewardXp: 400, active: true }
+];
+
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const PRIORITY_ORDER = { "High": 1, "Medium": 2, "Low": 3 };
 
+function getLevelRankTitle(level) {
+  if (level <= 1) return { title: "Novice Ascendant", icon: "🌱", color: "#a0aec0" };
+  if (level <= 3) return { title: "Disciplined Seeker", icon: "⚔️", color: "#48bb78" };
+  if (level <= 5) return { title: "Consistent Adventurer", icon: "🔥", color: "#ed8936" };
+  if (level <= 7) return { title: "Knowledge Builder", icon: "🧠", color: "#4299e1" };
+  if (level <= 9) return { title: "Data Warrior", icon: "💻", color: "#9f7aea" };
+  if (level <= 14) return { title: "Technical Champion", icon: "⚡", color: "#f5b942" };
+  return { title: "Grand Ascended Master", icon: "🚀", color: "#e53e3e" };
+}
+
 // --- INDEXEDDB MULTI-USER ISOLATED STORAGE ---
 const DB_NAME = "project_ascend_v4_db";
-const DB_VERSION = 3;
-const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history"];
+const DB_VERSION = 4;
+const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus"];
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -115,7 +131,9 @@ function useUserLocalState(user) {
     wishlist: [],
     concepts: [],
     side_quests: [],
-    ai_chat_history: []
+    ai_chat_history: [],
+    challenges: [],
+    daily_focus: {}
   });
   const [ready, setReady] = useState(false);
 
@@ -126,7 +144,7 @@ function useUserLocalState(user) {
 
     async function load() {
       try {
-        const [tasks, completionsArr, books, wishlist, concepts, sideQuestsArr, chatHistoryArr] = await Promise.all(
+        const [tasks, completionsArr, books, wishlist, concepts, sideQuestsArr, chatHistoryArr, challengesArr, dailyFocusArr] = await Promise.all(
           STORES.map(s => idbGetUserRecords(s, userId))
         );
         if (!active) return;
@@ -164,6 +182,16 @@ function useUserLocalState(user) {
           }));
         }
 
+        let finalChallenges = challengesArr;
+        if (!finalChallenges || finalChallenges.length === 0) {
+          finalChallenges = STARTER_CHALLENGES.map(c => ({ ...c, user_id: userId }));
+        }
+
+        const dailyFocusMap = {};
+        (dailyFocusArr || []).forEach(f => {
+          if (f.date) dailyFocusMap[f.date] = f.goal;
+        });
+
         setState({
           tasks: finalTasks,
           completions: completionsMap,
@@ -171,7 +199,9 @@ function useUserLocalState(user) {
           wishlist,
           concepts: finalConcepts,
           side_quests: sideQuestsArr || [],
-          ai_chat_history: chatHistoryArr || []
+          ai_chat_history: chatHistoryArr || [],
+          challenges: finalChallenges,
+          daily_focus: dailyFocusMap
         });
         setReady(true);
       } catch (err) {
@@ -203,7 +233,18 @@ function useUserLocalState(user) {
           idbSaveUserRecords("wishlist", state.wishlist, userId),
           idbSaveUserRecords("concepts", state.concepts, userId),
           idbSaveUserRecords("side_quests", state.side_quests || [], userId),
-          idbSaveUserRecords("ai_chat_history", state.ai_chat_history || [], userId)
+          idbSaveUserRecords("ai_chat_history", state.ai_chat_history || [], userId),
+          idbSaveUserRecords("challenges", state.challenges || [], userId),
+          idbSaveUserRecords(
+            "daily_focus",
+            Object.keys(state.daily_focus || {}).map(d => ({
+              id: `${userId}:${d}`,
+              date: d,
+              goal: state.daily_focus[d],
+              user_id: userId
+            })),
+            userId
+          )
         ]);
       } catch (e) {
         console.error("Error saving state to IndexedDB:", e);
@@ -589,6 +630,31 @@ function App() {
     }
   };
 
+  const recoverSideQuest = (sqId) => {
+    if (confirm("Recover this failed quest? You will earn 50% XP without altering past activity records.")) {
+      setLocal(s => ({
+        ...s,
+        side_quests: (s.side_quests || []).map(sq => {
+          if (sq.id === sqId) {
+            return { ...sq, completed: true, recovered: true, recovered_at: new Date().toISOString() };
+          }
+          return sq;
+        })
+      }));
+    }
+  };
+
+  const updateDailyFocus = (goal) => {
+    const today = todayStr();
+    setLocal(s => ({
+      ...s,
+      daily_focus: {
+        ...(s.daily_focus || {}),
+        [today]: goal
+      }
+    }));
+  };
+
   // --- PUSH NOTIFICATION REMINDERS FOR SIDE QUESTS (10 MIN PRE-DUE) ---
   const requestNotificationPermission = async () => {
     if (typeof Notification === "undefined") {
@@ -830,10 +896,14 @@ function App() {
         {[
           { id: "dashboard", label: "Dashboard", icon: <Trophy size={16} /> },
           { id: "quests", label: "Quests Center ⚔️", icon: <Swords size={16} /> },
+          { id: "history", label: "Quest History 📜", icon: <CalendarDays size={16} /> },
+          { id: "achievements", label: "Achievements 🏆", icon: <Trophy size={16} /> },
+          { id: "ascension", label: "Ascension 🗺️", icon: <Target size={16} /> },
+          { id: "challenges", label: "Challenges 🎯", icon: <Shield size={16} /> },
           { id: "ai", label: "Ascend AI 🤖", icon: <Sparkles size={16} /> },
           { id: "reading", label: "Reading Center", icon: <BookOpen size={16} /> },
           { id: "wishlist", label: "Wishlist", icon: <ShoppingCart size={16} /> },
-          { id: "analytics", label: "Analytics & History", icon: <BarChart2 size={16} /> },
+          { id: "analytics", label: "Analytics & Insights", icon: <BarChart2 size={16} /> },
           { id: "settings", label: "Settings", icon: <Settings size={16} /> }
         ].map(t => (
           <button
@@ -867,6 +937,7 @@ function App() {
           toggleSideQuestCompletion={toggleSideQuestCompletion}
           onOpenSideQuestModal={setSideQuestModal}
           onNavigateToSideQuests={() => { setTab("quests"); setQuestSubTab("side"); }}
+          updateDailyFocus={updateDailyFocus}
         />
       )}
 
@@ -888,6 +959,36 @@ function App() {
           onDeleteSideQuest={deleteSideQuest}
           notifPermission={notifPermission}
           requestNotificationPermission={requestNotificationPermission}
+        />
+      )}
+
+      {tab === "history" && (
+        <HistoryView
+          local={local}
+          recoverSideQuest={recoverSideQuest}
+        />
+      )}
+
+      {tab === "achievements" && (
+        <AchievementsView
+          local={local}
+          streakStats={streakStats}
+          totalXpAllTime={totalXpAllTime}
+          currentLevel={currentLevel}
+        />
+      )}
+
+      {tab === "ascension" && (
+        <AscensionJourneyView
+          currentLevel={currentLevel}
+          totalXpAllTime={totalXpAllTime}
+        />
+      )}
+
+      {tab === "challenges" && (
+        <ChallengesView
+          local={local}
+          setLocal={setLocal}
         />
       )}
 
@@ -1040,13 +1141,16 @@ function App() {
 function DashboardView({
   tasks, local, toggleCompletion, toggleLock, completionPct, todayCompletionsCount,
   todayXp, currentLevel, levelProgress, totalXpAllTime, streakStats, logReadingTenPages,
-  onNavigate, sideQuests, toggleSideQuestCompletion, onOpenSideQuestModal, onNavigateToSideQuests
+  onNavigate, sideQuests, toggleSideQuestCompletion, onOpenSideQuestModal, onNavigateToSideQuests, updateDailyFocus
 }) {
   const formattedDate = new Date().toLocaleDateString(undefined, {
     weekday: "long", day: "numeric", month: "long", year: "numeric"
   });
 
   const activeBook = local.books.find(b => b.status === "Reading") || local.books[0];
+  const rankInfo = getLevelRankTitle(currentLevel);
+  const todayFocusGoal = (local.daily_focus || {})[todayStr()] || "";
+  const [focusInput, setFocusInput] = useState(todayFocusGoal);
 
   const todaySideQuests = useMemo(() => {
     const filtered = (sideQuests || []).filter(sq => sq.date === todayStr());
@@ -1063,10 +1167,11 @@ function DashboardView({
   }, [sideQuests]);
 
   const todaySideQuestsDone = todaySideQuests.filter(sq => sq.completed).length;
+  const sidePct = todaySideQuests.length ? Math.round((todaySideQuestsDone / todaySideQuests.length) * 100) : 0;
 
   return (
     <main className="viewContainer fade-in">
-      {/* HERO HERO SECTION */}
+      {/* TODAY'S ASCENSION HERO RPG CARD */}
       <section className="heroCard">
         <div className="heroInfo">
           <div className="eyebrowText">
@@ -1074,20 +1179,38 @@ function DashboardView({
             <span>TODAY • {formattedDate.toUpperCase()}</span>
           </div>
           <h1>
-            Build the version of you<br />
-            <span>you actually want.</span>
+            TODAY'S ASCENSION<br />
+            <span>{rankInfo.icon} {rankInfo.title.toUpperCase()}</span>
           </h1>
           <p className="heroDesc">
-            Your personal operating system for coding, learning, career, health, and high performance.
+            A game where your real life is the game. Complete daily responsibilities to level up.
           </p>
 
           {/* LEVEL BAR WIDGET */}
           <div className="levelWidget">
-            <div className="levelBadge">LEVEL {currentLevel}</div>
+            <div className="levelBadge" style={{ background: rankInfo.color }}>LEVEL {currentLevel} • {rankInfo.title}</div>
             <div className="levelBarContainer">
               <div className="levelBarFill" style={{ width: `${levelProgress}%` }}></div>
             </div>
             <span className="levelXpText">{levelProgress} / 100 XP to Level {currentLevel + 1}</span>
+          </div>
+
+          {/* DUAL QUEST PROGRESS BARS */}
+          <div className="dualProgressRow" style={{ marginTop: 14 }}>
+            <div className="miniProgGroup">
+              <small>Main Quests ({todayCompletionsCount}/{tasks.length})</small>
+              <div className="levelBarContainer">
+                <div className="levelBarFill" style={{ width: `${completionPct}%`, background: '#f5b942' }}></div>
+              </div>
+              <span>{completionPct}%</span>
+            </div>
+            <div className="miniProgGroup">
+              <small>Side Quests ({todaySideQuestsDone}/{todaySideQuests.length})</small>
+              <div className="levelBarContainer">
+                <div className="levelBarFill" style={{ width: `${sidePct}%`, background: '#48bb78' }}></div>
+              </div>
+              <span>{sidePct}%</span>
+            </div>
           </div>
         </div>
 
@@ -1105,6 +1228,29 @@ function DashboardView({
             </div>
           </div>
         </div>
+      </section>
+
+      {/* TODAY'S FOCUS CARD */}
+      <section className="glassPanel marginTop" style={{ padding: "16px 20px" }}>
+        <div className="panelHeader" style={{ marginBottom: 8 }}>
+          <div>
+            <h3>🎯 TODAY'S PRIMARY FOCUS</h3>
+            <span className="panelSub">Identify your single most critical objective for today</span>
+          </div>
+        </div>
+        <form onSubmit={(e) => { e.preventDefault(); updateDailyFocus(focusInput); }} className="focusInputRow">
+          <input
+            type="text"
+            placeholder="e.g. Finish AI/ML learning module & submit application"
+            value={focusInput}
+            onChange={(e) => setFocusInput(e.target.value)}
+            onBlur={() => updateDailyFocus(focusInput)}
+            className="focusInput"
+          />
+          <button type="submit" className="primaryBtn smallBtn">
+            <span>Set Focus</span>
+          </button>
+        </form>
       </section>
 
       {/* METRICS ROW */}
@@ -2595,6 +2741,52 @@ function AnalyticsView({ local, tasks, streakStats, totalXpAllTime }) {
     return Object.entries(map).map(([name, value]) => ({ name, value }));
   }, [local.completions, tasks]);
 
+  // Weekly Ascension Report Calculation
+  const weeklyReport = useMemo(() => {
+    let weekDone = 0;
+    let weekTotal = tasks.length * 7;
+    let weekXp = 0;
+    const daysData = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dayStr = d.toISOString().slice(0, 10);
+      const dayName = d.toLocaleDateString(undefined, { weekday: "short" });
+      const done = tasks.filter(t => local.completions[`${t.id}:${dayStr}`]).length;
+      const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+      weekDone += done;
+      weekXp += done * 20;
+      daysData.push({ dayName, pct, done, dayStr });
+    }
+
+    daysData.sort((a, b) => b.pct - a.pct);
+    const bestDay = daysData[0] ? `${daysData[0].dayName} (${daysData[0].pct}%)` : "N/A";
+    const needsWork = daysData[daysData.length - 1] ? `${daysData[daysData.length - 1].dayName} (${daysData[daysData.length - 1].pct}%)` : "N/A";
+    const totalPct = weekTotal ? Math.round((weekDone / weekTotal) * 100) : 0;
+
+    let advice = "Great momentum! Keep your streak alive by completing high priority side quests daily.";
+    if (totalPct < 50) {
+      advice = "Your completion rate drops on weekends or busy days. Consider focusing on top 3 priority tasks first.";
+    }
+
+    return { weekDone, weekTotal, totalPct, weekXp, bestDay, needsWork, advice };
+  }, [local.completions, tasks]);
+
+  const insights = useMemo(() => {
+    const totalCompletions = Object.keys(local.completions || {}).filter(k => local.completions[k]).length;
+    if (totalCompletions < 3) {
+      return ["Keep completing quests! Ascend is learning your productivity patterns."];
+    }
+    const list = [];
+    if (streakStats.currentStreak >= 3) {
+      list.push(`🔥 Strong momentum! You're on a ${streakStats.currentStreak}-day active streak.`);
+    }
+    list.push(`📈 Best completion day this week: ${weeklyReport.bestDay}`);
+    list.push(`⚠️ Needs attention: ${weeklyReport.needsWork}`);
+    return list;
+  }, [local.completions, streakStats, weeklyReport]);
+
   const COLORS = ["#f5b942", "#3b82f6", "#10b981", "#ec4899", "#8b5cf6", "#f97316"];
 
   return (
@@ -2602,13 +2794,64 @@ function AnalyticsView({ local, tasks, streakStats, totalXpAllTime }) {
       <div className="pageHeaderRow">
         <div>
           <div className="eyebrowText"><BarChart2 size={13} /> PERFORMANCE INTELLIGENCE</div>
-          <h2 className="pageTitle">ANALYTICS & HISTORY</h2>
+          <h2 className="pageTitle">ANALYTICS & INSIGHTS</h2>
           <p className="pageSubtitle">Real metrics calculated strictly from your verified daily activity log.</p>
         </div>
       </div>
 
+      {/* WEEKLY ASCENSION REPORT CARD */}
+      <div className="glassPanel">
+        <div className="panelHeader">
+          <div>
+            <h3>WEEKLY ASCENSION REPORT</h3>
+            <span className="panelSub">7-Day performance summary & coaching recommendation</span>
+          </div>
+        </div>
+
+        <div className="weeklyReportGrid">
+          <div className="wCard">
+            <strong>{weeklyReport.weekDone} / {weeklyReport.weekTotal}</strong>
+            <small>Quests Completed ({weeklyReport.totalPct}%)</small>
+          </div>
+          <div className="wCard">
+            <strong>+{weeklyReport.weekXp} XP</strong>
+            <small>XP Earned This Week</small>
+          </div>
+          <div className="wCard">
+            <strong>{weeklyReport.bestDay}</strong>
+            <small>Best Day</small>
+          </div>
+          <div className="wCard">
+            <strong>{weeklyReport.needsWork}</strong>
+            <small>Needs Work</small>
+          </div>
+        </div>
+
+        <div className="weeklyAdviceBox" style={{ marginTop: 14 }}>
+          <strong>💡 NEXT WEEK STRATEGY:</strong>
+          <p style={{ margin: "4px 0 0 0" }}>{weeklyReport.advice}</p>
+        </div>
+      </div>
+
+      {/* ASCEND INSIGHTS CARD */}
+      <div className="glassPanel marginTop">
+        <div className="panelHeader">
+          <div>
+            <h3>🧠 ASCEND INSIGHTS</h3>
+            <span className="panelSub">Pattern recognition derived from actual task completion data</span>
+          </div>
+        </div>
+        <div className="insightsList">
+          {insights.map((item, idx) => (
+            <div key={idx} className="insightItem">
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* STATS OVERVIEW CARDS */}
-      <div className="metricsGrid">
+      <div className="metricsGrid marginTop">
         <div className="metricCard">
           <div className="metricIcon flame"><Flame size={22} /></div>
           <div className="metricData">
@@ -2710,6 +2953,331 @@ function AnalyticsView({ local, tasks, streakStats, totalXpAllTime }) {
             )}
           </div>
         </div>
+      </div>
+    </main>
+  );
+}
+
+// ==========================================
+// QUEST HISTORY VIEW COMPONENT
+// ==========================================
+function HistoryView({ local, recoverSideQuest }) {
+  const [filter, setFilter] = useState("all"); // "all" | "main" | "side" | "completed" | "missed"
+
+  const historyItems = useMemo(() => {
+    const items = [];
+    const today = todayStr();
+
+    // Side Quests
+    (local.side_quests || []).forEach(sq => {
+      const isMissed = sq.date < today && !sq.completed && !sq.recovered;
+      items.push({
+        id: sq.id,
+        title: sq.title,
+        type: "Side Quest",
+        date: sq.date,
+        priority: sq.priority || "Medium",
+        completed: sq.completed,
+        recovered: sq.recovered,
+        isMissed,
+        xp: sq.priority === "High" ? 30 : sq.priority === "Medium" ? 20 : 10,
+        timestamp: sq.completedAt || sq.createdAt || sq.date
+      });
+    });
+
+    // Main Quest Completions
+    Object.keys(local.completions || {}).forEach(k => {
+      if (local.completions[k]) {
+        const [taskId, completedOn] = k.split(":");
+        const task = (local.tasks || []).find(t => t.id === taskId);
+        items.push({
+          id: `${taskId}-${completedOn}`,
+          title: task ? task.title : "Main Quest",
+          type: "Main Quest",
+          date: completedOn,
+          priority: "Medium",
+          completed: true,
+          recovered: false,
+          isMissed: false,
+          xp: task ? (task.xp || 10) : 10,
+          timestamp: completedOn
+        });
+      }
+    });
+
+    // Sort descending by date
+    items.sort((a, b) => b.date.localeCompare(a.date));
+
+    if (filter === "main") return items.filter(i => i.type === "Main Quest");
+    if (filter === "side") return items.filter(i => i.type === "Side Quest");
+    if (filter === "completed") return items.filter(i => i.completed);
+    if (filter === "missed") return items.filter(i => i.isMissed);
+    return items;
+  }, [local.side_quests, local.completions, local.tasks, filter]);
+
+  return (
+    <main className="viewContainer fade-in">
+      <div className="pageHeaderRow">
+        <div>
+          <div className="eyebrowText"><CalendarDays size={13} /> HISTORICAL LOGS</div>
+          <h2 className="pageTitle">QUEST HISTORY</h2>
+          <p className="pageSubtitle">Browse all past Main Quests, Side Quests, completion timestamps, and recovery logs.</p>
+        </div>
+
+        <div className="filterPillsRow">
+          {["all", "main", "side", "completed", "missed"].map(f => (
+            <button
+              key={f}
+              className={`filterPillBtn ${filter === f ? "active" : ""}`}
+              onClick={() => setFilter(f)}
+            >
+              {f.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="glassPanel">
+        {historyItems.length === 0 ? (
+          <div className="emptyState">No quest history found for selected filter.</div>
+        ) : (
+          <div className="historyTable">
+            {historyItems.map(item => (
+              <div key={item.id} className={`historyRow ${item.completed ? "done" : item.isMissed ? "missed" : ""}`}>
+                <div className="historyColDate">
+                  <strong>{item.date}</strong>
+                </div>
+                <div className="historyColTitle">
+                  <strong>{item.title}</strong>
+                  <div className="historyTags">
+                    <span className={`typeTag ${item.type === "Main Quest" ? "main" : "side"}`}>{item.type}</span>
+                    <span className={`prioTag ${item.priority}`}>{item.priority} Priority</span>
+                  </div>
+                </div>
+                <div className="historyColStatus">
+                  {item.completed ? (
+                    <span className="statusTag success">
+                      {item.recovered ? "🔄 Recovered (+15 XP)" : `✅ Completed (+${item.xp} XP)`}
+                    </span>
+                  ) : item.isMissed ? (
+                    <div className="failedGroup">
+                      <span className="statusTag danger">❌ QUEST FAILED</span>
+                      <button className="primaryBtn smallBtn" onClick={() => recoverSideQuest(item.id)}>
+                        Recover Quest (Half XP)
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="statusTag warning">⏳ Pending</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
+
+// ==========================================
+// ACHIEVEMENTS VIEW COMPONENT
+// ==========================================
+function AchievementsView({ local, streakStats, totalXpAllTime, currentLevel }) {
+  const achievements = useMemo(() => {
+    const totalCompletions = Object.keys(local.completions || {}).filter(k => local.completions[k]).length;
+    const sideCompletions = (local.side_quests || []).filter(sq => sq.completed).length;
+    const codingCompletions = (local.side_quests || []).filter(sq => sq.completed && (sq.category || "").toLowerCase().includes("code")).length;
+    const totalPagesRead = (local.books || []).reduce((acc, b) => acc + (b.current_page || 0), 0);
+
+    return [
+      {
+        id: "ach-1",
+        title: "🏆 FIRST BLOOD",
+        desc: "Complete your first quest.",
+        progress: Math.min(totalCompletions + sideCompletions, 1),
+        target: 1,
+        unlocked: (totalCompletions + sideCompletions) >= 1
+      },
+      {
+        id: "ach-2",
+        title: "🔥 7-DAY WARRIOR",
+        desc: "Maintain a 7-day streak.",
+        progress: Math.min(streakStats.maxStreak, 7),
+        target: 7,
+        unlocked: streakStats.maxStreak >= 7
+      },
+      {
+        id: "ach-3",
+        title: "💀 NO EXCUSES",
+        desc: "Complete all Main Quests for 7 consecutive days.",
+        progress: Math.min(streakStats.currentStreak, 7),
+        target: 7,
+        unlocked: streakStats.currentStreak >= 7
+      },
+      {
+        id: "ach-4",
+        title: "📚 KNOWLEDGE SEEKER",
+        desc: "Read 100 pages total across your books.",
+        progress: Math.min(totalPagesRead, 100),
+        target: 100,
+        unlocked: totalPagesRead >= 100
+      },
+      {
+        id: "ach-5",
+        title: "💻 CODE WARRIOR",
+        desc: "Complete 50 coding or technical quests.",
+        progress: Math.min(codingCompletions, 50),
+        target: 50,
+        unlocked: codingCompletions >= 50
+      },
+      {
+        id: "ach-6",
+        title: "🚀 ASCENSION",
+        desc: "Reach Level 10.",
+        progress: Math.min(currentLevel, 10),
+        target: 10,
+        unlocked: currentLevel >= 10
+      },
+      {
+        id: "ach-7",
+        title: "🗡️ SIDE QUEST HERO",
+        desc: "Complete 20 Side Quests.",
+        progress: Math.min(sideCompletions, 20),
+        target: 20,
+        unlocked: sideCompletions >= 20
+      },
+      {
+        id: "ach-8",
+        title: "⚡ CENTURION",
+        desc: "Earn 1,000 total cumulative XP.",
+        progress: Math.min(totalXpAllTime, 1000),
+        target: 1000,
+        unlocked: totalXpAllTime >= 1000
+      }
+    ];
+  }, [local, streakStats, totalXpAllTime, currentLevel]);
+
+  return (
+    <main className="viewContainer fade-in">
+      <div className="pageHeaderRow">
+        <div>
+          <div className="eyebrowText"><Trophy size={13} /> MILESTONES & BADGES</div>
+          <h2 className="pageTitle">ACHIEVEMENTS</h2>
+          <p className="pageSubtitle">Unlock RPG trophies by hitting real-world productivity milestones.</p>
+        </div>
+      </div>
+
+      <div className="achievementsGrid">
+        {achievements.map(ach => {
+          const pct = Math.round((ach.progress / ach.target) * 100);
+          return (
+            <div key={ach.id} className={`achievementCard glassPanel ${ach.unlocked ? "unlocked" : "locked"}`}>
+              <div className="achHead">
+                <h3>{ach.title}</h3>
+                <span className={`statusTag ${ach.unlocked ? "success" : "dim"}`}>
+                  {ach.unlocked ? "UNLOCKED 🔓" : "LOCKED 🔒"}
+                </span>
+              </div>
+              <p className="achDesc">{ach.desc}</p>
+              <div className="achProgressRow">
+                <div className="achBar">
+                  <div className="achFill" style={{ width: `${pct}%` }}></div>
+                </div>
+                <span className="achNum">{ach.progress} / {ach.target}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </main>
+  );
+}
+
+// ==========================================
+// ASCENSION JOURNEY VIEW COMPONENT
+// ==========================================
+function AscensionJourneyView({ currentLevel, totalXpAllTime }) {
+  const ranks = [
+    { level: 1, title: "🌱 Novice Ascendant", desc: "Beginning of your RPG journey", minXp: 0 },
+    { level: 2, title: "⚔️ Disciplined Seeker", desc: "Building consistent daily routines", minXp: 100 },
+    { level: 4, title: "🔥 Consistent Adventurer", desc: "Sustaining 7+ day streaks", minXp: 300 },
+    { level: 6, title: "🧠 Knowledge Builder", desc: "Mastering core concepts & reading focus", minXp: 500 },
+    { level: 8, title: "💻 Data Warrior", desc: "Executing high priority technical quests", minXp: 700 },
+    { level: 10, title: "⚡ Technical Champion", desc: "Overcoming major multi-day challenges", minXp: 900 },
+    { level: 15, title: "🚀 Grand Ascended Master", desc: "Pinnacle of personal ascendance", minXp: 1400 }
+  ];
+
+  return (
+    <main className="viewContainer fade-in">
+      <div className="pageHeaderRow">
+        <div>
+          <div className="eyebrowText"><Target size={13} /> LONG-TERM CHARACTER GROWTH</div>
+          <h2 className="pageTitle">ASCENSION JOURNEY</h2>
+          <p className="pageSubtitle">Your RPG evolution tree from Novice Ascendant to Grand Ascended Master.</p>
+        </div>
+      </div>
+
+      <div className="journeyTree glassPanel">
+        {ranks.map((r, i) => {
+          const isCurrent = currentLevel >= r.level && (i === ranks.length - 1 || currentLevel < ranks[i + 1].level);
+          const isReached = currentLevel >= r.level;
+          return (
+            <React.Fragment key={r.level}>
+              <div className={`journeyStepCard ${isCurrent ? "current" : isReached ? "reached" : "future"}`}>
+                <div className="stepRankTitle">{r.title}</div>
+                <div className="stepLevelTag">Level {r.level}+ ({r.minXp} Total XP)</div>
+                <p className="stepDesc">{r.desc}</p>
+                {isCurrent && <div className="currentBadge">CURRENT RANK</div>}
+              </div>
+              {i < ranks.length - 1 && <div className={`journeyConnector ${isReached ? "reached" : ""}`}>↓</div>}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </main>
+  );
+}
+
+// ==========================================
+// CHALLENGES VIEW COMPONENT
+// ==========================================
+function ChallengesView({ local, setLocal }) {
+  const challenges = local.challenges || [];
+
+  return (
+    <main className="viewContainer fade-in">
+      <div className="pageHeaderRow">
+        <div>
+          <div className="eyebrowText"><Shield size={13} /> LONG-TERM OBJECTIVES</div>
+          <h2 className="pageTitle">CHALLENGES</h2>
+          <p className="pageSubtitle">Multi-day challenges designed to push your boundaries and earn massive XP.</p>
+        </div>
+      </div>
+
+      <div className="challengesGrid">
+        {challenges.map(c => {
+          const pct = Math.round((c.completedDays / c.targetDays) * 100);
+          return (
+            <div key={c.id} className="challengeCard glassPanel">
+              <div className="chHead">
+                <div>
+                  <span className="catTag">{c.category}</span>
+                  <h3>{c.title}</h3>
+                </div>
+                <span className="xpBadge">+{c.rewardXp} XP</span>
+              </div>
+              <div className="chProgress">
+                <div className="progressInfo">
+                  <span>{c.completedDays} of {c.targetDays} Days</span>
+                  <span>{pct}%</span>
+                </div>
+                <div className="levelBarContainer">
+                  <div className="levelBarFill" style={{ width: `${pct}%` }}></div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </main>
   );
