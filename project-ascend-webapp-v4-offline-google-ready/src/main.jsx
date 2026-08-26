@@ -47,8 +47,8 @@ const PRIORITY_ORDER = { "High": 1, "Medium": 2, "Low": 3 };
 
 // --- INDEXEDDB MULTI-USER ISOLATED STORAGE ---
 const DB_NAME = "project_ascend_v4_db";
-const DB_VERSION = 2;
-const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests"];
+const DB_VERSION = 3;
+const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history"];
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -68,19 +68,24 @@ function openDB() {
 }
 
 async function idbGetUserRecords(storeName, userId) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, "readonly");
-    const index = tx.objectStore(storeName).index("user_id");
-    const req = index.getAll(userId);
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => reject(req.error);
-  });
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, "readonly");
+      const store = tx.objectStore(storeName);
+      const index = store.index("user_id");
+      const req = index.getAll(userId);
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  } catch {
+    return [];
+  }
 }
 
 async function idbSaveUserRecords(storeName, records, userId) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
+  try {
+    const db = await openDB();
     const tx = db.transaction(storeName, "readwrite");
     const store = tx.objectStore(storeName);
     const index = store.index("user_id");
@@ -91,9 +96,13 @@ async function idbSaveUserRecords(storeName, records, userId) {
       existingKeys.forEach(k => store.delete(k));
       records.forEach(r => store.put({ ...r, user_id: userId }));
     };
-    tx.oncomplete = resolve;
-    tx.onerror = () => reject(tx.error);
-  });
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    console.error("IDB save error:", e);
+  }
 }
 
 // Custom Hook for User-Scoped Offline State
@@ -105,7 +114,8 @@ function useUserLocalState(user) {
     books: [],
     wishlist: [],
     concepts: [],
-    side_quests: []
+    side_quests: [],
+    ai_chat_history: []
   });
   const [ready, setReady] = useState(false);
 
@@ -116,7 +126,7 @@ function useUserLocalState(user) {
 
     async function load() {
       try {
-        const [tasks, completionsArr, books, wishlist, concepts, sideQuestsArr] = await Promise.all(
+        const [tasks, completionsArr, books, wishlist, concepts, sideQuestsArr, chatHistoryArr] = await Promise.all(
           STORES.map(s => idbGetUserRecords(s, userId))
         );
         if (!active) return;
@@ -160,7 +170,8 @@ function useUserLocalState(user) {
           books,
           wishlist,
           concepts: finalConcepts,
-          side_quests: sideQuestsArr || []
+          side_quests: sideQuestsArr || [],
+          ai_chat_history: chatHistoryArr || []
         });
         setReady(true);
       } catch (err) {
@@ -191,7 +202,8 @@ function useUserLocalState(user) {
           idbSaveUserRecords("books", state.books, userId),
           idbSaveUserRecords("wishlist", state.wishlist, userId),
           idbSaveUserRecords("concepts", state.concepts, userId),
-          idbSaveUserRecords("side_quests", state.side_quests || [], userId)
+          idbSaveUserRecords("side_quests", state.side_quests || [], userId),
+          idbSaveUserRecords("ai_chat_history", state.ai_chat_history || [], userId)
         ]);
       } catch (e) {
         console.error("Error saving state to IndexedDB:", e);
@@ -224,6 +236,7 @@ function App() {
       return "default";
     }
   });
+  const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem("ascend_gemini_api_key") || "");
 
   const [local, setLocal, localReady, userId] = useUserLocalState(user);
 
@@ -817,6 +830,7 @@ function App() {
         {[
           { id: "dashboard", label: "Dashboard", icon: <Trophy size={16} /> },
           { id: "quests", label: "Quests Center ⚔️", icon: <Swords size={16} /> },
+          { id: "ai", label: "Ascend AI 🤖", icon: <Sparkles size={16} /> },
           { id: "reading", label: "Reading Center", icon: <BookOpen size={16} /> },
           { id: "wishlist", label: "Wishlist", icon: <ShoppingCart size={16} /> },
           { id: "analytics", label: "Analytics & History", icon: <BarChart2 size={16} /> },
@@ -877,6 +891,19 @@ function App() {
         />
       )}
 
+      {tab === "ai" && (
+        <AscendAiView
+          local={local}
+          setLocal={setLocal}
+          streakStats={streakStats}
+          totalXpAllTime={totalXpAllTime}
+          geminiKey={geminiKey}
+          setGeminiKey={setGeminiKey}
+          onNavigate={setTab}
+          onOpenSideQuestModal={setSideQuestModal}
+        />
+      )}
+
       {tab === "reading" && (
         <ReadingView
           books={local.books}
@@ -911,6 +938,8 @@ function App() {
           syncing={syncing}
           notifPermission={notifPermission}
           requestNotificationPermission={requestNotificationPermission}
+          geminiKey={geminiKey}
+          setGeminiKey={setGeminiKey}
         />
       )}
 
@@ -1308,6 +1337,402 @@ function DashboardView({
           </div>
         </div>
       </section>
+    </main>
+  );
+}
+
+// ==========================================
+// RAG KNOWLEDGE SYNTHESIZER & AI ENGINE
+// ==========================================
+function buildUserRagContext(local, streakStats, totalXpAllTime) {
+  const today = todayStr();
+  const currentLevel = Math.floor(totalXpAllTime / 100) + 1;
+  const xpInLevel = totalXpAllTime % 100;
+  const xpNeeded = 100 - xpInLevel;
+
+  // Main Quests Summary
+  const mainQuestsList = (local.tasks || []).map(t => {
+    const isDone = !!local.completions[`${t.id}:${today}`];
+    return `- ${t.title} [Category: ${t.category || 'General'}, XP: +${t.xp || 10}, Status: ${isDone ? '✅ Completed Today' : '⏳ Pending Today'}, Locked: ${t.locked ? 'Yes' : 'No'}]`;
+  }).join("\n");
+
+  // Side Quests Summary (Today & Upcoming)
+  const sideQuestsList = (local.side_quests || []).map(sq => {
+    const isToday = sq.date === today;
+    return `- ${sq.title} [Date: ${sq.date} ${isToday ? '(TODAY)' : ''}, Priority: ${sq.priority}, Due: ${sq.due_time || 'No Time'}, Category: ${sq.category || 'General'}, Status: ${sq.completed ? '✅ Completed' : '⏳ Pending'}${sq.description ? `, Details: "${sq.description}"` : ''}]`;
+  }).join("\n");
+
+  // Reading Center Summary
+  const booksList = (local.books || []).map(b => {
+    const pct = b.total_pages ? Math.round((b.current_page / b.total_pages) * 100) : 0;
+    return `- "${b.title}" by ${b.author || 'Unknown'} [Status: ${b.status}, Progress: Page ${b.current_page} of ${b.total_pages || '?'} (${pct}%), Notes: "${b.notes || 'None'}"]`;
+  }).join("\n");
+
+  // Wishlist Summary
+  const wishlistList = (local.wishlist || []).map(w => {
+    return `- ${w.item} [Category: ${w.category || 'General'}, Cost: ₹${w.estimated_cost || 0}, Priority: ${w.priority}, Status: ${w.purchased ? '✅ Purchased' : '⏳ Pending'}]`;
+  }).join("\n");
+
+  // Core Concepts Summary
+  const conceptsList = (local.concepts || []).map(c => `- ${c.title}: ${c.subtitle || 'Daily target'}`).join("\n");
+
+  return `
+=== USER PROFILE & STATS ===
+- Today's Date: ${today}
+- Character Level: Level ${currentLevel} (${totalXpAllTime} Total Cumulative XP)
+- XP Progress: ${xpInLevel}/100 XP (${xpNeeded} XP needed for Level ${currentLevel + 1})
+- Streak Stats: ${streakStats.currentStreak} Days Current Streak (Best: ${streakStats.maxStreak} Days)
+
+=== MAIN QUESTS (DAILY ROUTINES) ===
+${mainQuestsList || 'No main quests setup.'}
+
+=== SIDE QUESTS (DATE-SPECIFIC TASKS & ERRANDS) ===
+${sideQuestsList || 'No side quests recorded.'}
+
+=== READING COMMAND CENTER ===
+${booksList || 'No books in library.'}
+
+=== WISHLIST TARGETS ===
+${wishlistList || 'No wishlist items.'}
+
+=== CORE CONCEPTS ROTATION ===
+${conceptsList || 'No core concepts.'}
+`.trim();
+}
+
+function queryOfflineAscendAi(queryText, ragContext, local, streakStats, totalXpAllTime) {
+  const query = queryText.toLowerCase();
+  const today = todayStr();
+  const currentLevel = Math.floor(totalXpAllTime / 100) + 1;
+  const xpInLevel = totalXpAllTime % 100;
+  const xpNeeded = 100 - xpInLevel;
+
+  const sideQuests = local.side_quests || [];
+  const mainQuests = local.tasks || [];
+  const books = local.books || [];
+  const wishlist = local.wishlist || [];
+
+  // Query: Today's side quests / pending side quests
+  if (query.includes("side quest") || query.includes("temporary task") || query.includes("errand") || query.includes("due")) {
+    const todaySide = sideQuests.filter(sq => sq.date === today);
+    const pendingSide = todaySide.filter(sq => !sq.completed);
+    const highSide = pendingSide.filter(sq => sq.priority === "High");
+
+    if (todaySide.length === 0) {
+      return `⚔️ **No Side Quests Scheduled for Today (${today})**\n\nYour battlefield is clear for today! You can add a new temporary task anytime using the **+ Add Side Quest** button on the Dashboard or Quests Center.`;
+    }
+
+    let response = `⚔️ **Today's Side Quests Summary (${today})**\n\n`;
+    response += `You have **${todaySide.length} total side quests** today (**${todaySide.length - pendingSide.length} completed**, **${pendingSide.length} pending**).\n\n`;
+
+    if (highSide.length > 0) {
+      response += `🔥 **High Priority Pending (${highSide.length})**:\n`;
+      highSide.forEach(sq => {
+        response += `- **${sq.title}** ${sq.due_time ? `(⏰ Due ${sq.due_time})` : ''} [+30 XP]\n`;
+      });
+      response += `\n`;
+    }
+
+    if (pendingSide.length > 0) {
+      response += `⏳ **All Pending Side Quests**:\n`;
+      pendingSide.forEach(sq => {
+        response += `- [${sq.priority}] **${sq.title}** ${sq.due_time ? `(⏰ ${sq.due_time})` : ''}\n`;
+      });
+    } else {
+      response += `🎉 **All side quests for today are COMPLETED! Great work hero!**`;
+    }
+
+    return response;
+  }
+
+  // Query: Level / XP / Stats / Streak
+  if (query.includes("level") || query.includes("xp") || query.includes("streak") || query.includes("stat")) {
+    return `🏆 **Character Stats & Level Progress**\n\n` +
+      `- **Current Level**: **Level ${currentLevel}**\n` +
+      `- **Total Cumulative XP**: **${totalXpAllTime} XP**\n` +
+      `- **Next Level**: Need **${xpNeeded} XP** to reach Level ${currentLevel + 1} (${xpInLevel}/100 XP)\n` +
+      `- **Daily Streak**: **${streakStats.currentStreak} Days** (Best Record: ${streakStats.maxStreak} Days)\n\n` +
+      `💡 *Tip: Complete High Priority Side Quests (+30 XP) or Main Quests (+10 XP) to level up faster!*`;
+  }
+
+  // Query: Reading / Book
+  if (query.includes("read") || query.includes("book") || query.includes("page") || query.includes("library")) {
+    if (books.length === 0) {
+      return `📚 **Reading Command Center**\n\nNo books tracked in your library yet. Navigate to the **Reading Center** tab to add a book!`;
+    }
+    const readingBook = books.find(b => b.status === "Reading") || books[0];
+    const pct = readingBook.total_pages ? Math.round((readingBook.current_page / readingBook.total_pages) * 100) : 0;
+
+    let resp = `📚 **Reading Library Progress**\n\n`;
+    resp += `📖 **Active Focus**: "${readingBook.title}" ${readingBook.author ? `by ${readingBook.author}` : ''}\n`;
+    resp += `- **Page Progress**: Page **${readingBook.current_page}** of **${readingBook.total_pages || '?'}** (${pct}% completed)\n`;
+    resp += `- **Status**: ${readingBook.status}\n`;
+    if (readingBook.notes) resp += `- **Notes**: "${readingBook.notes}"\n`;
+
+    if (books.length > 1) {
+      resp += `\n📚 **Other Books in Library**:\n`;
+      books.filter(b => b.id !== readingBook.id).forEach(b => {
+        resp += `- "${b.title}" (${b.status})\n`;
+      });
+    }
+
+    return resp;
+  }
+
+  // Query: Main Quests / Routines
+  if (query.includes("main quest") || query.includes("routine") || query.includes("habit") || query.includes("today task")) {
+    const doneCount = mainQuests.filter(t => local.completions[`${t.id}:${today}`]).length;
+    let resp = `📜 **Main Quests Daily Routine (${today})**\n\n`;
+    resp += `Progress: **${doneCount}/${mainQuests.length} Completed** (${mainQuests.length ? Math.round((doneCount / mainQuests.length) * 100) : 0}%)\n\n`;
+    mainQuests.forEach(t => {
+      const isDone = local.completions[`${t.id}:${today}`];
+      resp += `- ${isDone ? '✅' : '⏳'} **${t.title}** [${t.category}] (+${t.xp} XP)\n`;
+    });
+    return resp;
+  }
+
+  // Query: Productivity Plan
+  if (query.includes("plan") || query.includes("coach") || query.includes("recommend") || query.includes("action")) {
+    const todaySide = sideQuests.filter(sq => sq.date === today && !sq.completed);
+    const highSide = todaySide.filter(sq => sq.priority === "High");
+
+    let resp = `💡 **Ascend AI Action Plan for Today (${today})**\n\n`;
+    resp += `1. **Priority #1**: Finish high-priority side quests (${highSide.length} pending).\n`;
+    if (highSide.length > 0) {
+      highSide.forEach(sq => { resp += `   - ${sq.title} ${sq.due_time ? `(⏰ ${sq.due_time})` : ''}\n`; });
+    }
+    resp += `2. **Priority #2**: Complete main quest routines to maintain your **${streakStats.currentStreak}-day streak**.\n`;
+    resp += `3. **Priority #3**: Log 10 pages in your Reading Center to earn extra XP towards Level ${currentLevel + 1}.\n`;
+    return resp;
+  }
+
+  // Default General Summary Response
+  const todaySide = sideQuests.filter(sq => sq.date === today && !sq.completed);
+  const mainDone = mainQuests.filter(t => local.completions[`${t.id}:${today}`]).length;
+
+  return `🤖 **Ascend AI Assistant Summary**\n\n` +
+    `Here is a quick snapshot of your personal OS right now:\n\n` +
+    `- 🏆 **Level**: Level ${currentLevel} (${totalXpAllTime} Total XP)\n` +
+    `- 📜 **Main Quests**: ${mainDone}/${mainQuests.length} Done Today\n` +
+    `- ⚔️ **Pending Side Quests**: ${todaySide.length} Pending Today\n` +
+    `- 🔥 **Daily Streak**: ${streakStats.currentStreak} Days\n\n` +
+    `You can ask me specific questions like:\n` +
+    `• *"What side quests are pending today?"*\n` +
+    `• *"How much XP do I need for next level?"*\n` +
+    `• *"What page am I on in my reading book?"*\n` +
+    `• *"Give me a productivity plan for today"*`;
+}
+
+async function queryGeminiAscendAi(messages, ragContext, apiKey) {
+  const systemInstruction = `You are Ascend AI, an intelligent personal productivity coach and assistant built into Project Ascend (an offline-first personal operating system for daily quests, learning, habits, wishlist, reading, and level progression).
+
+Here is the LIVE, REAL-TIME DATA CONTEXT of the user's personal operating system:
+${ragContext}
+
+INSTRUCTIONS:
+1. Respond conversationally, concisely, and helpfully in GitHub-flavored markdown.
+2. Direct the user accurately based on their current tasks, side quests, reading progress, and XP levels.
+3. Be highly encouraging and focused on personal ascendance, high performance, and clarity.`;
+
+  const formattedContents = messages.map(m => ({
+    role: m.sender === "user" ? "user" : "model",
+    parts: [{ text: m.text }]
+  }));
+
+  const payload = {
+    contents: formattedContents,
+    systemInstruction: {
+      parts: [{ text: systemInstruction }]
+    }
+  };
+
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error?.message || `Gemini API returned status ${res.status}`);
+  }
+
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("No response text returned from Gemini API");
+  return text;
+}
+
+// ==========================================
+// ASCEND AI VIEW COMPONENT
+// ==========================================
+function AscendAiView({
+  local, setLocal, streakStats, totalXpAllTime, geminiKey, setGeminiKey, onNavigate, onOpenSideQuestModal
+}) {
+  const [inputText, setInputText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [chatHistory, setChatHistory] = useState(local.ai_chat_history || []);
+
+  const ragContext = useMemo(() => {
+    return buildUserRagContext(local, streakStats, totalXpAllTime);
+  }, [local, streakStats, totalXpAllTime]);
+
+  const handleSendMessage = async (textToSend) => {
+    const query = (textToSend || inputText).trim();
+    if (!query || loading) return;
+
+    const userMsg = {
+      id: crypto.randomUUID(),
+      sender: "user",
+      text: query,
+      timestamp: new Date().toISOString()
+    };
+
+    const newHistory = [...chatHistory, userMsg];
+    setChatHistory(newHistory);
+    setInputText("");
+    setLoading(true);
+
+    try {
+      let aiText = "";
+      if (geminiKey && geminiKey.trim()) {
+        try {
+          aiText = await queryGeminiAscendAi(newHistory, ragContext, geminiKey.trim());
+        } catch (geminiErr) {
+          console.warn("Gemini API error, falling back to local RAG engine:", geminiErr);
+          aiText = `⚠️ *[Gemini API Error: ${geminiErr.message}. Switched to built-in RAG Assistant]*\n\n` +
+            queryOfflineAscendAi(query, ragContext, local, streakStats, totalXpAllTime);
+        }
+      } else {
+        // Use built-in offline RAG Assistant
+        aiText = queryOfflineAscendAi(query, ragContext, local, streakStats, totalXpAllTime);
+      }
+
+      const aiMsg = {
+        id: crypto.randomUUID(),
+        sender: "ai",
+        text: aiText,
+        timestamp: new Date().toISOString()
+      };
+
+      const finalHistory = [...newHistory, aiMsg];
+      setChatHistory(finalHistory);
+      setLocal(s => ({ ...s, ai_chat_history: finalHistory }));
+    } catch (err) {
+      console.error("Chat error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearHistory = () => {
+    if (confirm("Clear all AI chat history?")) {
+      setChatHistory([]);
+      setLocal(s => ({ ...s, ai_chat_history: [] }));
+    }
+  };
+
+  const promptChips = [
+    "⚔️ What side quests are pending today?",
+    "🏆 What is my Level & XP progress?",
+    "📚 How am I doing on my reading focus?",
+    "📜 Show main quest routines",
+    "💡 Give me a 3-step productivity plan for today"
+  ];
+
+  return (
+    <main className="viewContainer fade-in">
+      {/* PAGE HEADER */}
+      <div className="pageHeaderRow">
+        <div>
+          <div className="eyebrowText">
+            <Sparkles size={13} /> PERSONAL PRODUCTIVITY COACH & RAG ENGINE
+          </div>
+          <h2 className="pageTitle">ASCEND AI 🤖</h2>
+          <p className="pageSubtitle">
+            Ask anything about your pending tasks, side quest deadlines, reading progress, XP stats, or get custom coaching plans.
+          </p>
+        </div>
+
+        <div className="headerBtnGroup">
+          {chatHistory.length > 0 && (
+            <button className="secondaryBtn smallBtn" onClick={clearHistory}>
+              <Trash2 size={14} />
+              <span>Clear Chat</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* MAIN CHAT CONTAINER */}
+      <div className="glassPanel aiChatCard">
+        {/* CHAT MESSAGES THREAD */}
+        <div className="aiChatThread">
+          {chatHistory.length === 0 ? (
+            <div className="aiEmptyChatState">
+              <div className="aiAvatarBig">🤖</div>
+              <h3>Welcome to Ascend AI</h3>
+              <p>
+                I have full, real-time knowledge of your Main Quests, Side Quests, Reading Library, Wishlist, and Level Stats.
+                Ask me a question or tap a suggestion chip below!
+              </p>
+            </div>
+          ) : (
+            chatHistory.map((msg) => (
+              <div key={msg.id} className={`chatBubbleRow ${msg.sender}`}>
+                <div className="chatAvatar">{msg.sender === "user" ? "👤" : "🤖"}</div>
+                <div className="chatBubbleContent">
+                  <div className="chatBubbleHeader">
+                    <strong>{msg.sender === "user" ? "You" : "Ascend AI"}</strong>
+                    <small>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>
+                  </div>
+                  <div className="chatTextBody">
+                    {msg.text.split("\n").map((line, i) => (
+                      <p key={i}>{line}</p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+
+          {loading && (
+            <div className="chatBubbleRow ai">
+              <div className="chatAvatar">🤖</div>
+              <div className="chatBubbleContent">
+                <div className="typingDots">
+                  <span></span><span></span><span></span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* PROMPT CHIPS */}
+        <div className="promptChipsRow">
+          {promptChips.map((chip, idx) => (
+            <button key={idx} className="promptChipBtn" onClick={() => handleSendMessage(chip)}>
+              {chip}
+            </button>
+          ))}
+        </div>
+
+        {/* INPUT BOX */}
+        <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="aiChatInputRow">
+          <input
+            type="text"
+            placeholder="Ask Ascend AI about tasks, due times, books, level stats..."
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            className="aiInput"
+          />
+          <button type="submit" className="primaryBtn" disabled={!inputText.trim() || loading}>
+            <span>Send</span>
+          </button>
+        </form>
+      </div>
     </main>
   );
 }
@@ -2293,18 +2718,41 @@ function AnalyticsView({ local, tasks, streakStats, totalXpAllTime }) {
 // ==========================================
 // 6. SETTINGS VIEW COMPONENT
 // ==========================================
-function SettingsView({ user, online, syncWithCloud, syncing, notifPermission, requestNotificationPermission }) {
+function SettingsView({ user, online, syncWithCloud, syncing, notifPermission, requestNotificationPermission, geminiKey, setGeminiKey }) {
   return (
     <main className="viewContainer fade-in">
       <div className="pageHeaderRow">
         <div>
           <div className="eyebrowText"><Settings size={13} /> ARCHITECTURE & SYNC</div>
           <h2 className="pageTitle">SYSTEM SETTINGS</h2>
-          <p className="pageSubtitle">Manage Google OAuth, cloud synchronization, push notifications, and offline storage state.</p>
+          <p className="pageSubtitle">Manage Google OAuth, cloud synchronization, push notifications, AI configuration, and offline storage state.</p>
         </div>
       </div>
 
       <div className="glassPanel">
+        <h3>🤖 Ascend AI LLM Configuration (Google Gemini API)</h3>
+        <p className="settingsDesc">
+          Ascend AI functions 100% offline out-of-the-box using the built-in RAG assistant engine. Optionally paste your free Google Gemini API Key below to enable full conversational LLM reasoning.
+        </p>
+
+        <div className="formGroup" style={{ marginTop: 12, maxWidth: 500 }}>
+          <label>Google Gemini API Key (Optional)</label>
+          <input
+            type="password"
+            placeholder="AIzaSy..."
+            value={geminiKey}
+            onChange={(e) => {
+              setGeminiKey(e.target.value);
+              localStorage.setItem("ascend_gemini_api_key", e.target.value.trim());
+            }}
+          />
+          <small className="dimText" style={{ marginTop: 4, display: "block" }}>
+            {geminiKey ? "✅ Gemini API Key Configured" : "💡 Leave blank to use 100% offline RAG assistant engine."}
+          </small>
+        </div>
+      </div>
+
+      <div className="glassPanel marginTop">
         <h3>⚔️ Side Quest Push Notifications (10-Min Pre-Due Reminder)</h3>
         <p className="settingsDesc">
           Receive web push notifications 10 minutes before any Side Quest is due if it hasn't been completed.
