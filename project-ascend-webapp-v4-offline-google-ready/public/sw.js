@@ -1,4 +1,4 @@
-const CACHE_NAME = "ascend-pwa-v6";
+const CACHE_NAME = "ascend-pwa-v7";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -28,6 +28,22 @@ self.addEventListener("activate", (event) => {
     })
   );
   self.clients.claim();
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (let client of clientList) {
+        if (client.url && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow("/");
+      }
+    })
+  );
 });
 
 self.addEventListener("fetch", (event) => {

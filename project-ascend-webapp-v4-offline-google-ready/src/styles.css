@@ -1559,4 +1559,27 @@ button, input, select, textarea {
   color: var(--accent-gold);
 }
 
+.headerBtnGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.notifActiveBtn {
+  border-color: rgba(245, 185, 66, 0.4);
+  color: var(--accent-gold);
+}
+
+.notifEnableBtn {
+  background: rgba(245, 185, 66, 0.15);
+  color: var(--accent-gold);
+  border: 1px solid rgba(245, 185, 66, 0.3);
+}
+
+.notifEnableBtn:hover {
+  background: var(--accent-gold);
+  color: #0b0d14;
+}
+
 

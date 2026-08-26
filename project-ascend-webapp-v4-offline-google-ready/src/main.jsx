@@ -5,7 +5,7 @@ import {
   Check, Flame, Plus, Settings, BookOpen, LogIn, LogOut, WifiOff, Cloud,
   Pencil, Trash2, ArrowUp, ArrowDown, Lock, Unlock, Calendar, Trophy,
   BarChart2, Sparkles, X, ChevronRight, RefreshCw, ShoppingCart, Target,
-  Layers, CheckCircle2, Circle, Swords, Shield, Clock, CalendarDays
+  Layers, CheckCircle2, Circle, Swords, Shield, Clock, CalendarDays, Bell, BellOff
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart,
@@ -568,6 +568,89 @@ function App() {
     }
   };
 
+  // --- PUSH NOTIFICATION REMINDERS FOR SIDE QUESTS (10 MIN PRE-DUE) ---
+  const requestNotificationPermission = async () => {
+    if (typeof Notification === "undefined") {
+      alert("Browser push notifications are not supported on this device/browser.");
+      return;
+    }
+    try {
+      const perm = await Notification.requestPermission();
+      setNotifPermission(perm);
+      if (perm === "granted") {
+        const title = "⚔️ Notifications Enabled!";
+        const options = {
+          body: "You will receive reminders 10 minutes before your Side Quests are due.",
+          icon: "/icon-192.png",
+          badge: "/favicon-32.png"
+        };
+        if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.ready.then(reg => reg.showNotification(title, options));
+        } else {
+          new Notification(title, options);
+        }
+      } else if (perm === "denied") {
+        alert("Notification permission was denied in browser settings.");
+      }
+    } catch (e) {
+      console.error("Error requesting notification permission:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (notifPermission !== "granted") return;
+
+    const checkSideQuestReminders = () => {
+      const today = todayStr();
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+      const activeSideQuests = local.side_quests || [];
+      const todayQuests = activeSideQuests.filter(sq => sq.date === today && !sq.completed && sq.due_time);
+
+      todayQuests.forEach(sq => {
+        const parts = sq.due_time.split(":");
+        if (parts.length < 2) return;
+        const h = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        if (isNaN(h) || isNaN(m)) return;
+
+        const dueMinutes = h * 60 + m;
+        const diffMinutes = dueMinutes - nowMinutes;
+
+        // Trigger notification if 10 minutes or less remain before due time (down to -2m overdue)
+        if (diffMinutes <= 10 && diffMinutes >= -2) {
+          const storageKey = `sq_notified_${sq.id}_${today}`;
+          if (!localStorage.getItem(storageKey)) {
+            localStorage.setItem(storageKey, "true");
+
+            const title = diffMinutes > 0
+              ? `⚔️ Side Quest Due in ${diffMinutes}m!`
+              : `⚔️ Side Quest Due NOW!`;
+            const body = `"${sq.title}" is due at ${sq.due_time}. Complete it to earn XP!`;
+            const options = {
+              body,
+              icon: "/icon-192.png",
+              badge: "/favicon-32.png",
+              tag: `sq-reminder-${sq.id}`,
+              renotify: true
+            };
+
+            if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+              navigator.serviceWorker.ready.then(reg => reg.showNotification(title, options));
+            } else if (typeof Notification !== "undefined") {
+              new Notification(title, options);
+            }
+          }
+        }
+      });
+    };
+
+    checkSideQuestReminders();
+    const interval = setInterval(checkSideQuestReminders, 20000);
+    return () => clearInterval(interval);
+  }, [local.side_quests, notifPermission]);
+
   // --- QUICK LOG 10 PAGES READING ACTION ---
   const logReadingTenPages = () => {
     const activeBook = local.books.find(b => b.status === "Reading") || local.books[0];
@@ -781,6 +864,8 @@ function App() {
           toggleSideQuestCompletion={toggleSideQuestCompletion}
           onOpenSideQuestModal={setSideQuestModal}
           onDeleteSideQuest={deleteSideQuest}
+          notifPermission={notifPermission}
+          requestNotificationPermission={requestNotificationPermission}
         />
       )}
 
@@ -816,6 +901,8 @@ function App() {
           online={online}
           syncWithCloud={syncWithCloud}
           syncing={syncing}
+          notifPermission={notifPermission}
+          requestNotificationPermission={requestNotificationPermission}
         />
       )}
 
@@ -1356,7 +1443,8 @@ function EditQuestsView({
 function QuestsSection({
   subTab, setSubTab, tasks, concepts, toggleLock, moveOrder, onOpenQuestModal,
   onDeleteQuest, onOpenConceptModal, onDeleteConcept, sideQuests,
-  toggleSideQuestCompletion, onOpenSideQuestModal, onDeleteSideQuest
+  toggleSideQuestCompletion, onOpenSideQuestModal, onDeleteSideQuest,
+  notifPermission, requestNotificationPermission
 }) {
   const todayPendingSideCount = useMemo(() => {
     return (sideQuests || []).filter(sq => sq.date === todayStr() && !sq.completed).length;
@@ -1420,6 +1508,8 @@ function QuestsSection({
           toggleCompletion={toggleSideQuestCompletion}
           onOpenModal={onOpenSideQuestModal}
           onDelete={onDeleteSideQuest}
+          notifPermission={notifPermission}
+          requestNotificationPermission={requestNotificationPermission}
         />
       )}
     </main>
@@ -1429,7 +1519,7 @@ function QuestsSection({
 // ==========================================
 // SIDE QUEST VIEW COMPONENT
 // ==========================================
-function SideQuestView({ sideQuests, toggleCompletion, onOpenModal, onDelete }) {
+function SideQuestView({ sideQuests, toggleCompletion, onOpenModal, onDelete, notifPermission, requestNotificationPermission }) {
   const [selectedDate, setSelectedDate] = useState(todayStr());
 
   const changeDate = (days) => {
@@ -1468,13 +1558,23 @@ function SideQuestView({ sideQuests, toggleCompletion, onOpenModal, onDelete }) 
             Manage day-specific tasks, assignments, meetings, and errands without cluttering your permanent Main Quest routine.
           </p>
         </div>
-        <button
-          className="primaryBtn"
-          onClick={() => onOpenModal({ isNew: true, defaultDate: selectedDate })}
-        >
-          <Plus size={16} />
-          <span>Add Side Quest</span>
-        </button>
+        <div className="headerBtnGroup">
+          <button
+            className={`secondaryBtn ${notifPermission === "granted" ? "notifActiveBtn" : "notifEnableBtn"}`}
+            onClick={requestNotificationPermission}
+            title={notifPermission === "granted" ? "10m reminders active" : "Enable 10-minute due reminders"}
+          >
+            {notifPermission === "granted" ? <Bell size={16} color="#f5b942" /> : <BellOff size={16} />}
+            <span>{notifPermission === "granted" ? "10m Reminders Active" : "Enable 10m Reminders"}</span>
+          </button>
+          <button
+            className="primaryBtn"
+            onClick={() => onOpenModal({ isNew: true, defaultDate: selectedDate })}
+          >
+            <Plus size={16} />
+            <span>Add Side Quest</span>
+          </button>
+        </div>
       </div>
 
       {/* DATE NAVIGATION BAR */}
@@ -2165,18 +2265,39 @@ function AnalyticsView({ local, tasks, streakStats, totalXpAllTime }) {
 // ==========================================
 // 6. SETTINGS VIEW COMPONENT
 // ==========================================
-function SettingsView({ user, online, syncWithCloud, syncing }) {
+function SettingsView({ user, online, syncWithCloud, syncing, notifPermission, requestNotificationPermission }) {
   return (
     <main className="viewContainer fade-in">
       <div className="pageHeaderRow">
         <div>
           <div className="eyebrowText"><Settings size={13} /> ARCHITECTURE & SYNC</div>
           <h2 className="pageTitle">SYSTEM SETTINGS</h2>
-          <p className="pageSubtitle">Manage Google OAuth, cloud synchronization, and offline storage state.</p>
+          <p className="pageSubtitle">Manage Google OAuth, cloud synchronization, push notifications, and offline storage state.</p>
         </div>
       </div>
 
       <div className="glassPanel">
+        <h3>⚔️ Side Quest Push Notifications (10-Min Pre-Due Reminder)</h3>
+        <p className="settingsDesc">
+          Receive web push notifications 10 minutes before any Side Quest is due if it hasn't been completed.
+        </p>
+
+        <div className="settingsActions">
+          <button
+            className={notifPermission === "granted" ? "secondaryBtn" : "primaryBtn"}
+            onClick={requestNotificationPermission}
+          >
+            {notifPermission === "granted" ? <Bell size={16} color="#f5b942" /> : <BellOff size={16} />}
+            <span>
+              {notifPermission === "granted"
+                ? "10m Reminders Active (Click to Test)"
+                : "Enable 10-Min Pre-Due Reminders"}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <div className="glassPanel marginTop">
         <h3>User Authentication</h3>
         <p className="settingsDesc">
           {user
