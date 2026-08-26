@@ -144,10 +144,74 @@ function useUserLocalState(user) {
 
     async function load() {
       try {
-        const [tasks, completionsArr, books, wishlist, concepts, sideQuestsArr, chatHistoryArr, challengesArr, dailyFocusArr] = await Promise.all(
+        let [tasks, completionsArr, books, wishlist, concepts, sideQuestsArr, chatHistoryArr, challengesArr, dailyFocusArr] = await Promise.all(
           STORES.map(s => idbGetUserRecords(s, userId))
         );
         if (!active) return;
+
+        // AUTO-MIGRATE GUEST DATA TO LOGGED-IN USER ACCOUNT
+        if (userId !== "guest") {
+          const guestTasks = await idbGetUserRecords("tasks", "guest");
+          const guestCompletions = await idbGetUserRecords("completions", "guest");
+          const guestSideQuests = await idbGetUserRecords("side_quests", "guest");
+          const guestBooks = await idbGetUserRecords("books", "guest");
+          const guestWishlist = await idbGetUserRecords("wishlist", "guest");
+
+          const hasGuestData = (
+            (guestCompletions && guestCompletions.length > 0) ||
+            (guestSideQuests && guestSideQuests.length > 0) ||
+            (guestBooks && guestBooks.length > 0) ||
+            (guestWishlist && guestWishlist.length > 0) ||
+            (guestTasks && guestTasks.some(t => !t.id.startsWith("starter-")))
+          );
+
+          if (hasGuestData) {
+            console.log("Migrating guest offline data to user profile:", userId);
+            
+            // Merge tasks
+            const taskMap = new Map();
+            (tasks || []).forEach(t => taskMap.set(t.title, t));
+            (guestTasks || []).forEach(gt => {
+              if (!gt.id.startsWith("starter-") || !taskMap.has(gt.title)) {
+                taskMap.set(gt.title, { ...gt, user_id: userId });
+              }
+            });
+            tasks = Array.from(taskMap.values());
+
+            // Merge completions
+            const compMap = new Map();
+            (completionsArr || []).forEach(c => compMap.set(c.key || `${c.task_id}:${c.completed_on}`, c));
+            (guestCompletions || []).forEach(gc => compMap.set(gc.key || `${gc.task_id}:${gc.completed_on}`, { ...gc, user_id: userId }));
+            completionsArr = Array.from(compMap.values());
+
+            // Merge side quests
+            const sqMap = new Map();
+            (sideQuestsArr || []).forEach(sq => sqMap.set(sq.id, sq));
+            (guestSideQuests || []).forEach(gsq => sqMap.set(gsq.id, { ...gsq, user_id: userId }));
+            sideQuestsArr = Array.from(sqMap.values());
+
+            // Merge books
+            const bMap = new Map();
+            (books || []).forEach(b => bMap.set(b.id, b));
+            (guestBooks || []).forEach(gb => bMap.set(gb.id, { ...gb, user_id: userId }));
+            books = Array.from(bMap.values());
+
+            // Merge wishlist
+            const wMap = new Map();
+            (wishlist || []).forEach(w => wMap.set(w.id, w));
+            (guestWishlist || []).forEach(gw => wMap.set(gw.id, { ...gw, user_id: userId }));
+            wishlist = Array.from(wMap.values());
+
+            // Persist migrated records to IndexedDB for logged-in user
+            await Promise.all([
+              idbSaveUserRecords("tasks", tasks, userId),
+              idbSaveUserRecords("completions", completionsArr, userId),
+              idbSaveUserRecords("side_quests", sideQuestsArr, userId),
+              idbSaveUserRecords("books", books, userId),
+              idbSaveUserRecords("wishlist", wishlist, userId)
+            ]);
+          }
+        }
 
         const completionsMap = {};
         completionsArr.forEach(c => {
@@ -1130,8 +1194,25 @@ function App() {
       )}
 
       <footer className="appFooter">
-        <img src="/favicon-16.png" alt="Project Ascend Logo" className="footerLogoImg" />
-        <span>PROJECT ASCEND • Offline-First Personal OS • Installable PWA</span>
+        <div className="footerInner">
+          <div className="footerBrandRow">
+            <div className="footerLogoGroup">
+              <img src="/favicon-16.png" alt="Project Ascend Logo" className="footerLogoImg" />
+              <span className="footerBrandName">PROJECT <span>ASCEND</span></span>
+            </div>
+            <span className="footerTagline">A game where your real life is the game.</span>
+          </div>
+
+          <div className="footerMetaRow">
+            <span className="footerPill">⚡ Offline-First PWA</span>
+            <span className="footerPill">🛡️ IndexedDB v4</span>
+            <span className="footerPill">🚀 Vercel Live OS</span>
+          </div>
+
+          <div className="footerCopyright">
+            <span>© {new Date().getFullYear()} PROJECT ASCEND • Personal Productivity RPG</span>
+          </div>
+        </div>
       </footer>
     </div>
   );

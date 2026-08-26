@@ -2132,4 +2132,80 @@ button, input, select, textarea {
   margin: 4px 0 0 0;
 }
 
+/* APP FOOTER STYLES */
+.appFooter {
+  margin-top: 50px;
+  padding: 30px 0 20px 0;
+  border-top: 1px solid var(--border-color);
+  background: rgba(11, 13, 20, 0.6);
+  backdrop-filter: blur(10px);
+}
+
+.footerInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.footerBrandRow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.footerLogoGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footerLogoImg {
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 0 10px rgba(245, 185, 66, 0.4));
+}
+
+.footerBrandName {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--text-main);
+}
+
+.footerBrandName span {
+  color: var(--accent-gold);
+}
+
+.footerTagline {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.footerMetaRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.footerPill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+}
+
+.footerCopyright {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
 
