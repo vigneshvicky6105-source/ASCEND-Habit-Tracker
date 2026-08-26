@@ -14,8 +14,8 @@ import {
 import "./styles.css";
 
 // --- SUPABASE CLIENT INITIALIZATION ---
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://vpfuiifncfzndkxstrwe.supabase.co";
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_gL3Gvfi67rQe2eDH42XG1A_4W0sOMuN";
 const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 // --- DEFAULT STARTER DATA ---
@@ -1041,6 +1041,8 @@ function App() {
           requestNotificationPermission={requestNotificationPermission}
           geminiKey={geminiKey}
           setGeminiKey={setGeminiKey}
+          handleGoogleLogin={handleGoogleLogin}
+          handleLogout={handleLogout}
         />
       )}
 
@@ -3286,7 +3288,7 @@ function ChallengesView({ local, setLocal }) {
 // ==========================================
 // 6. SETTINGS VIEW COMPONENT
 // ==========================================
-function SettingsView({ user, online, syncWithCloud, syncing, notifPermission, requestNotificationPermission, geminiKey, setGeminiKey }) {
+function SettingsView({ user, online, syncWithCloud, syncing, notifPermission, requestNotificationPermission, geminiKey, setGeminiKey, handleGoogleLogin, handleLogout }) {
   return (
     <main className="viewContainer fade-in">
       <div className="pageHeaderRow">
@@ -3298,6 +3300,36 @@ function SettingsView({ user, online, syncWithCloud, syncing, notifPermission, r
       </div>
 
       <div className="glassPanel">
+        <h3>🔐 User Authentication & Google OAuth</h3>
+        <p className="settingsDesc">
+          {user
+            ? `Signed in as ${user.email}. Your data is automatically backed up and synced to Supabase PostgreSQL.`
+            : "Operating in local guest mode. Sign in with your Google account via Supabase to enable cloud backup and cross-device sync."}
+        </p>
+
+        <div className="settingsActions" style={{ marginTop: 12 }}>
+          {user ? (
+            <button className="secondaryBtn" onClick={handleLogout}>
+              <LogOut size={16} />
+              <span>Sign Out ({user.email})</span>
+            </button>
+          ) : (
+            <button className="primaryBtn" onClick={handleGoogleLogin}>
+              <LogIn size={16} />
+              <span>Sign in with Google Account</span>
+            </button>
+          )}
+
+          {online && user && (
+            <button className="secondaryBtn" onClick={syncWithCloud} disabled={syncing}>
+              <RefreshCw size={16} className={syncing ? "spin" : ""} />
+              <span>{syncing ? "Syncing with Supabase..." : "Force Cloud Sync Now"}</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="glassPanel marginTop">
         <h3>🤖 Ascend AI LLM Configuration (Google Gemini API)</h3>
         <p className="settingsDesc">
           Ascend AI functions 100% offline out-of-the-box using the built-in RAG assistant engine. Optionally paste your free Google Gemini API Key below to enable full conversational LLM reasoning.
@@ -3342,21 +3374,10 @@ function SettingsView({ user, online, syncWithCloud, syncing, notifPermission, r
       </div>
 
       <div className="glassPanel marginTop">
-        <h3>User Authentication</h3>
+        <h3>Offline & PWA Configuration</h3>
         <p className="settingsDesc">
-          {user
-            ? `Signed in as ${user.email}. Your data is automatically backed up and synced to Supabase PostgreSQL.`
-            : "Operating in local guest mode. Connect your Google account via Supabase to enable cloud sync."}
+          Project Ascend uses IndexedDB as its primary database. The web app functions 100% offline, caching app shell assets via Service Worker. When internet reconnects, state automatically syncs to your Supabase PostgreSQL cloud tables.
         </p>
-
-        <div className="settingsActions">
-          {online && user && (
-            <button className="primaryBtn" onClick={syncWithCloud} disabled={syncing}>
-              <RefreshCw size={16} className={syncing ? "spin" : ""} />
-              <span>{syncing ? "Syncing with Supabase..." : "Force Cloud Sync Now"}</span>
-            </button>
-          )}
-        </div>
       </div>
 
       <div className="glassPanel marginTop">
