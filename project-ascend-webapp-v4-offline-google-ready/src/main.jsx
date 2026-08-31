@@ -364,19 +364,24 @@ function App() {
 
   const [local, setLocal, localReady, userId] = useUserLocalState(user);
 
-  // Service worker registration, online & tab visibility/focus listeners
+  // Service worker registration, online & tab visibility listeners
   useEffect(() => {
     const handleOnline = () => setOnline(true);
     const handleOffline = () => setOnline(false);
-    const handleFocusOrVisible = () => {
-      if ((document.visibilityState === "visible" || document.hasFocus()) && supabase && user && online) {
-        syncWithCloud();
+    let lastSyncTime = 0;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && supabase && user && online) {
+        const now = Date.now();
+        if (now - lastSyncTime > 10000) { // Throttle visibility sync to at most once per 10s
+          lastSyncTime = now;
+          syncWithCloud();
+        }
       }
     };
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
-    window.addEventListener("visibilitychange", handleFocusOrVisible);
-    window.addEventListener("focus", handleFocusOrVisible);
+    window.addEventListener("visibilitychange", handleVisibilityChange);
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").then((reg) => {
@@ -390,16 +395,14 @@ function App() {
       return () => {
         window.removeEventListener("online", handleOnline);
         window.removeEventListener("offline", handleOffline);
-        window.removeEventListener("visibilitychange", handleFocusOrVisible);
-        window.removeEventListener("focus", handleFocusOrVisible);
+        window.removeEventListener("visibilitychange", handleVisibilityChange);
         data?.subscription?.unsubscribe();
       };
     }
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
-      window.removeEventListener("visibilitychange", handleFocusOrVisible);
-      window.removeEventListener("focus", handleFocusOrVisible);
+      window.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [user, online]);
 
@@ -768,17 +771,31 @@ function App() {
         }
       }
 
-      // Commit merged cloud state locally
-      setLocal(s => ({
-        ...s,
-        tasks: currentTasks,
-        completions: completionsMap,
-        books: currentBooks,
-        wishlist: currentWishlist,
-        concepts: currentConcepts,
-        side_quests: currentSideQuests,
-        dues: currentDues
-      }));
+      // Commit merged cloud state locally only if data changed
+      setLocal(s => {
+        const hasTaskChanges = JSON.stringify(s.tasks) !== JSON.stringify(currentTasks);
+        const hasCompChanges = JSON.stringify(s.completions) !== JSON.stringify(completionsMap);
+        const hasBookChanges = JSON.stringify(s.books) !== JSON.stringify(currentBooks);
+        const hasWishChanges = JSON.stringify(s.wishlist) !== JSON.stringify(currentWishlist);
+        const hasConceptChanges = JSON.stringify(s.concepts) !== JSON.stringify(currentConcepts);
+        const hasSqChanges = JSON.stringify(s.side_quests) !== JSON.stringify(currentSideQuests);
+        const hasDueChanges = JSON.stringify(s.dues) !== JSON.stringify(currentDues);
+
+        if (!hasTaskChanges && !hasCompChanges && !hasBookChanges && !hasWishChanges && !hasConceptChanges && !hasSqChanges && !hasDueChanges) {
+          return s; // No changes, return existing state to prevent re-renders
+        }
+
+        return {
+          ...s,
+          tasks: currentTasks,
+          completions: completionsMap,
+          books: currentBooks,
+          wishlist: currentWishlist,
+          concepts: currentConcepts,
+          side_quests: currentSideQuests,
+          dues: currentDues
+        };
+      });
     } catch (err) {
       console.warn("Cloud sync deferred:", err);
     } finally {
@@ -786,7 +803,7 @@ function App() {
     }
   }
 
-  // Auto sync on state changes & set up Supabase Realtime channel subscription
+  // Auto sync on initial load & set up Supabase Realtime channel subscription
   useEffect(() => {
     if (!supabase || !user || !online || !localReady) return;
 
@@ -810,14 +827,6 @@ function App() {
       supabase.removeChannel(channel);
     };
   }, [user, online, localReady]);
-
-  // Debounced auto-sync when local state changes
-  useEffect(() => {
-    if (user && online && localReady) {
-      const timer = setTimeout(() => syncWithCloud(), 2500);
-      return () => clearTimeout(timer);
-    }
-  }, [user, online, localReady, local.tasks, local.completions, local.books, local.wishlist, local.concepts, local.side_quests, local.dues]);
 
   // Auth Handlers
   async function handleGoogleLogin() {
