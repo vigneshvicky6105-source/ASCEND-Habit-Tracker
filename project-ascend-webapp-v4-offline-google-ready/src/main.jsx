@@ -364,18 +364,19 @@ function App() {
 
   const [local, setLocal, localReady, userId] = useUserLocalState(user);
 
-  // Service worker registration, online & tab visibility listeners
+  // Service worker registration, online & tab visibility/focus listeners
   useEffect(() => {
     const handleOnline = () => setOnline(true);
     const handleOffline = () => setOnline(false);
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && supabase && user && online) {
+    const handleFocusOrVisible = () => {
+      if ((document.visibilityState === "visible" || document.hasFocus()) && supabase && user && online) {
         syncWithCloud();
       }
     };
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
-    window.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("visibilitychange", handleFocusOrVisible);
+    window.addEventListener("focus", handleFocusOrVisible);
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").then((reg) => {
@@ -389,18 +390,20 @@ function App() {
       return () => {
         window.removeEventListener("online", handleOnline);
         window.removeEventListener("offline", handleOffline);
-        window.removeEventListener("visibilitychange", handleVisibilityChange);
+        window.removeEventListener("visibilitychange", handleFocusOrVisible);
+        window.removeEventListener("focus", handleFocusOrVisible);
         data?.subscription?.unsubscribe();
       };
     }
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
-      window.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("visibilitychange", handleFocusOrVisible);
+      window.removeEventListener("focus", handleFocusOrVisible);
     };
   }, [user, online]);
 
-  // Supabase Cloud Synchronization Logic (Full Bidirectional Sync)
+  // Supabase Cloud Synchronization Logic (Robust Bidirectional Cross-Device Sync)
   async function syncWithCloud() {
     if (!supabase || !user || !online || !localReady) return;
     setSyncing(true);
@@ -412,43 +415,43 @@ function App() {
       let currentTasks = [...local.tasks];
 
       if (!tasksErr && cloudTasks) {
-        if (cloudTasks.length > 0) {
-          const cloudMap = new Map();
-          cloudTasks.forEach(ct => cloudMap.set(ct.id, ct));
+        const cloudMap = new Map(cloudTasks.map(ct => [ct.id, ct]));
+        const merged = [];
+        const matchedCloudIds = new Set();
 
-          const mergedTasks = [];
-          const matchedCloudIds = new Set();
-
-          currentTasks.forEach(lt => {
-            if (lt.id && typeof lt.id === "string" && lt.id.startsWith("starter-")) {
-              const matchedByTitle = cloudTasks.find(ct => ct.title === lt.title);
-              if (matchedByTitle) {
-                mergedTasks.push(matchedByTitle);
-                matchedCloudIds.add(matchedByTitle.id);
-              }
-            } else if (cloudMap.has(lt.id)) {
-              mergedTasks.push(cloudMap.get(lt.id));
-              matchedCloudIds.add(lt.id);
-            } else {
-              mergedTasks.push(lt);
+        currentTasks.forEach(lt => {
+          if (lt.id && typeof lt.id === "string" && lt.id.startsWith("starter-")) {
+            const matchedByTitle = cloudTasks.find(ct => ct.title === lt.title);
+            if (matchedByTitle) {
+              merged.push(matchedByTitle);
+              matchedCloudIds.add(matchedByTitle.id);
             }
-          });
+          } else if (cloudMap.has(lt.id)) {
+            const ct = cloudMap.get(lt.id);
+            const ltTime = lt.updated_at ? new Date(lt.updated_at).getTime() : 0;
+            const ctTime = ct.updated_at ? new Date(ct.updated_at).getTime() : 0;
+            merged.push(ltTime > ctTime + 1000 ? lt : ct);
+            matchedCloudIds.add(lt.id);
+          } else if (isValidUUID(lt.id) && lt.created_at && (new Date().getTime() - new Date(lt.created_at).getTime() < 300000)) {
+            // Newly created offline task (last 5 min)
+            merged.push(lt);
+          }
+        });
 
-          cloudTasks.forEach(ct => {
-            if (!matchedCloudIds.has(ct.id)) {
-              mergedTasks.push(ct);
-            }
-          });
+        cloudTasks.forEach(ct => {
+          if (!matchedCloudIds.has(ct.id)) {
+            merged.push(ct);
+          }
+        });
 
-          currentTasks = mergedTasks;
-        }
+        currentTasks = merged;
       }
 
-      // Filter tasks to upsert to cloud (only valid UUIDs)
+      // Upsert un-synced or updated tasks
       const tasksToUpsert = currentTasks
         .filter(t => t.id && (typeof t.id !== "string" || !t.id.startsWith("starter-")))
         .map(t => ({
-          id: t.id,
+          id: isValidUUID(t.id) ? t.id : undefined,
           user_id: uid,
           title: t.title,
           category: t.category || "Main Quest",
@@ -456,11 +459,16 @@ function App() {
           xp: t.xp || 10,
           locked: !!t.locked,
           active: t.active !== false,
-          sort_order: t.sort_order || 0
+          sort_order: t.sort_order || 0,
+          updated_at: t.updated_at || new Date().toISOString()
         }));
 
       if (tasksToUpsert.length > 0) {
-        await supabase.from("tasks").upsert(tasksToUpsert, { onConflict: "id" });
+        const { data: upsertedTasks } = await supabase.from("tasks").upsert(tasksToUpsert).select();
+        if (upsertedTasks && upsertedTasks.length > 0) {
+          const mapById = new Map(upsertedTasks.map(ut => [ut.id, ut]));
+          currentTasks = currentTasks.map(t => mapById.get(t.id) ? { ...t, ...mapById.get(t.id) } : t);
+        }
       }
 
       // 2. Fetch & Sync Task Completions
@@ -481,9 +489,7 @@ function App() {
           const [task_id, completed_on] = k.split(":");
           return { user_id: uid, task_id, completed_on };
         })
-        .filter(row => {
-          return row.task_id && typeof row.task_id === "string" && !row.task_id.startsWith("starter-");
-        });
+        .filter(row => row.task_id && typeof row.task_id === "string" && !row.task_id.startsWith("starter-"));
 
       if (completionRows.length > 0) {
         await supabase.from("task_completions").upsert(completionRows, {
@@ -496,18 +502,35 @@ function App() {
       let currentBooks = [...local.books];
 
       if (!bErr && cloudBooks) {
-        const bookMap = new Map();
-        currentBooks.forEach(b => {
-          if (typeof b.id !== "string" || !b.id.startsWith("book-")) bookMap.set(b.id, b);
+        const cloudMap = new Map(cloudBooks.map(cb => [cb.id, cb]));
+        const merged = [];
+        const matchedCloudIds = new Set();
+
+        currentBooks.forEach(lb => {
+          if (cloudMap.has(lb.id)) {
+            const cb = cloudMap.get(lb.id);
+            const lbTime = lb.updated_at ? new Date(lb.updated_at).getTime() : 0;
+            const cbTime = cb.updated_at ? new Date(cb.updated_at).getTime() : 0;
+            merged.push(lbTime > cbTime + 1000 ? lb : cb);
+            matchedCloudIds.add(lb.id);
+          } else if (isValidUUID(lb.id) && lb.created_at && (new Date().getTime() - new Date(lb.created_at).getTime() < 300000)) {
+            merged.push(lb);
+          }
         });
-        cloudBooks.forEach(cb => bookMap.set(cb.id, cb));
-        currentBooks = Array.from(bookMap.values());
+
+        cloudBooks.forEach(cb => {
+          if (!matchedCloudIds.has(cb.id)) {
+            merged.push(cb);
+          }
+        });
+
+        currentBooks = merged;
       }
 
       const booksToUpsert = currentBooks
         .filter(b => b.id && (typeof b.id !== "string" || !b.id.startsWith("book-")))
         .map(b => ({
-          id: b.id,
+          id: isValidUUID(b.id) ? b.id : undefined,
           user_id: uid,
           title: b.title,
           author: b.author || "",
@@ -520,7 +543,11 @@ function App() {
         }));
 
       if (booksToUpsert.length > 0) {
-        await supabase.from("books").upsert(booksToUpsert, { onConflict: "id" });
+        const { data: upsertedBooks } = await supabase.from("books").upsert(booksToUpsert).select();
+        if (upsertedBooks && upsertedBooks.length > 0) {
+          const mapById = new Map(upsertedBooks.map(ub => [ub.id, ub]));
+          currentBooks = currentBooks.map(b => mapById.get(b.id) ? { ...b, ...mapById.get(b.id) } : b);
+        }
       }
 
       // 4. Fetch & Sync Wishlist
@@ -528,18 +555,35 @@ function App() {
       let currentWishlist = [...local.wishlist];
 
       if (!wErr && cloudWishlist) {
-        const wMap = new Map();
-        currentWishlist.forEach(w => {
-          if (typeof w.id !== "string" || !w.id.startsWith("wish-")) wMap.set(w.id, w);
+        const cloudMap = new Map(cloudWishlist.map(cw => [cw.id, cw]));
+        const merged = [];
+        const matchedCloudIds = new Set();
+
+        currentWishlist.forEach(lw => {
+          if (cloudMap.has(lw.id)) {
+            const cw = cloudMap.get(lw.id);
+            const lwTime = lw.updated_at ? new Date(lw.updated_at).getTime() : 0;
+            const cwTime = cw.updated_at ? new Date(cw.updated_at).getTime() : 0;
+            merged.push(lwTime > cwTime + 1000 ? lw : cw);
+            matchedCloudIds.add(lw.id);
+          } else if (isValidUUID(lw.id) && lw.created_at && (new Date().getTime() - new Date(lw.created_at).getTime() < 300000)) {
+            merged.push(lw);
+          }
         });
-        cloudWishlist.forEach(cw => wMap.set(cw.id, cw));
-        currentWishlist = Array.from(wMap.values());
+
+        cloudWishlist.forEach(cw => {
+          if (!matchedCloudIds.has(cw.id)) {
+            merged.push(cw);
+          }
+        });
+
+        currentWishlist = merged;
       }
 
       const wishlistToUpsert = currentWishlist
         .filter(w => w.id && (typeof w.id !== "string" || !w.id.startsWith("wish-")))
         .map(w => ({
-          id: w.id,
+          id: isValidUUID(w.id) ? w.id : undefined,
           user_id: uid,
           item: w.item,
           category: w.category || "General",
@@ -550,7 +594,11 @@ function App() {
         }));
 
       if (wishlistToUpsert.length > 0) {
-        await supabase.from("wishlist").upsert(wishlistToUpsert, { onConflict: "id" });
+        const { data: upsertedWish } = await supabase.from("wishlist").upsert(wishlistToUpsert).select();
+        if (upsertedWish && upsertedWish.length > 0) {
+          const mapById = new Map(upsertedWish.map(uw => [uw.id, uw]));
+          currentWishlist = currentWishlist.map(w => mapById.get(w.id) ? { ...w, ...mapById.get(w.id) } : w);
+        }
       }
 
       // 5. Fetch & Sync Core Concepts
@@ -558,18 +606,32 @@ function App() {
       let currentConcepts = [...local.concepts];
 
       if (!cErr && cloudConcepts) {
-        const cMap = new Map();
-        currentConcepts.forEach(c => {
-          if (typeof c.id !== "string" || !c.id.startsWith("concept-")) cMap.set(c.id, c);
+        const cloudMap = new Map(cloudConcepts.map(cc => [cc.id, cc]));
+        const merged = [];
+        const matchedCloudIds = new Set();
+
+        currentConcepts.forEach(lc => {
+          if (cloudMap.has(lc.id)) {
+            merged.push(cloudMap.get(lc.id));
+            matchedCloudIds.add(lc.id);
+          } else if (isValidUUID(lc.id) && lc.created_at && (new Date().getTime() - new Date(lc.created_at).getTime() < 300000)) {
+            merged.push(lc);
+          }
         });
-        cloudConcepts.forEach(cc => cMap.set(cc.id, cc));
-        currentConcepts = Array.from(cMap.values());
+
+        cloudConcepts.forEach(cc => {
+          if (!matchedCloudIds.has(cc.id)) {
+            merged.push(cc);
+          }
+        });
+
+        currentConcepts = merged;
       }
 
       const conceptsToUpsert = currentConcepts
         .filter(c => c.id && (typeof c.id !== "string" || !c.id.startsWith("concept-")))
         .map(c => ({
-          id: c.id,
+          id: isValidUUID(c.id) ? c.id : undefined,
           user_id: uid,
           title: c.title,
           subtitle: c.subtitle || "Daily learning target",
@@ -577,7 +639,11 @@ function App() {
         }));
 
       if (conceptsToUpsert.length > 0) {
-        await supabase.from("core_concepts").upsert(conceptsToUpsert, { onConflict: "id" });
+        const { data: upsertedConcepts } = await supabase.from("core_concepts").upsert(conceptsToUpsert).select();
+        if (upsertedConcepts && upsertedConcepts.length > 0) {
+          const mapById = new Map(upsertedConcepts.map(uc => [uc.id, uc]));
+          currentConcepts = currentConcepts.map(c => mapById.get(c.id) ? { ...c, ...mapById.get(c.id) } : c);
+        }
       }
 
       // 6. Fetch & Sync Side Quests
@@ -585,18 +651,35 @@ function App() {
       let currentSideQuests = [...(local.side_quests || [])];
 
       if (!sqErr && cloudSideQuests) {
-        const sqMap = new Map();
-        currentSideQuests.forEach(sq => {
-          if (typeof sq.id !== "string" || !sq.id.startsWith("sq-")) sqMap.set(sq.id, sq);
+        const cloudMap = new Map(cloudSideQuests.map(csq => [csq.id, csq]));
+        const merged = [];
+        const matchedCloudIds = new Set();
+
+        currentSideQuests.forEach(lsq => {
+          if (cloudMap.has(lsq.id)) {
+            const csq = cloudMap.get(lsq.id);
+            const lsqTime = lsq.completed_at ? new Date(lsq.completed_at).getTime() : 0;
+            const csqTime = csq.completed_at ? new Date(csq.completed_at).getTime() : 0;
+            merged.push(lsqTime > csqTime + 1000 ? lsq : csq);
+            matchedCloudIds.add(lsq.id);
+          } else if (isValidUUID(lsq.id) && lsq.created_at && (new Date().getTime() - new Date(lsq.created_at).getTime() < 300000)) {
+            merged.push(lsq);
+          }
         });
-        cloudSideQuests.forEach(csq => sqMap.set(csq.id, csq));
-        currentSideQuests = Array.from(sqMap.values());
+
+        cloudSideQuests.forEach(csq => {
+          if (!matchedCloudIds.has(csq.id)) {
+            merged.push(csq);
+          }
+        });
+
+        currentSideQuests = merged;
       }
 
       const sqToUpsert = currentSideQuests
         .filter(sq => sq.id && (typeof sq.id !== "string" || !sq.id.startsWith("sq-")))
         .map(sq => ({
-          id: sq.id,
+          id: isValidUUID(sq.id) ? sq.id : undefined,
           user_id: uid,
           title: sq.title,
           description: sq.description || "",
@@ -610,38 +693,60 @@ function App() {
         }));
 
       if (sqToUpsert.length > 0) {
-        await supabase.from("side_quests").upsert(sqToUpsert, { onConflict: "id" });
+        const { data: upsertedSq } = await supabase.from("side_quests").upsert(sqToUpsert).select();
+        if (upsertedSq && upsertedSq.length > 0) {
+          const mapById = new Map(upsertedSq.map(usq => [usq.id, usq]));
+          currentSideQuests = currentSideQuests.map(sq => mapById.get(sq.id) ? { ...sq, ...mapById.get(sq.id) } : sq);
+        }
       }
 
       // 7. Fetch & Sync Dues
       const { data: cloudDues, error: dErr } = await supabase.from("dues").select("*").eq("user_id", uid);
-      let currentDues = (local.dues || []).map(d => isValidUUID(d.id) ? d : { ...d, id: crypto.randomUUID() });
+      let currentDues = [...(local.dues || [])];
 
       if (!dErr && cloudDues) {
-        const dMap = new Map();
-        currentDues.forEach(d => { if (isValidUUID(d.id)) dMap.set(d.id, d); });
-        cloudDues.forEach(cd => {
-          dMap.set(cd.id, {
-            id: cd.id,
-            user_id: uid,
-            type: cd.type || "lent",
-            person_name: cd.person_name || "",
-            original_amount: Number(cd.original_amount) || 0,
-            amount_paid: Number(cd.amount_paid) || 0,
-            date: cd.date || todayStr(),
-            due_date: cd.due_date || null,
-            reason: cd.reason || "",
-            status: cd.status || "Pending",
-            created_at: cd.created_at || new Date().toISOString(),
-            updated_at: cd.updated_at || new Date().toISOString()
-          });
+        const cloudMap = new Map(cloudDues.map(cd => [cd.id, cd]));
+        const merged = [];
+        const matchedCloudIds = new Set();
+
+        currentDues.forEach(ld => {
+          if (cloudMap.has(ld.id)) {
+            const cd = cloudMap.get(ld.id);
+            const ldTime = ld.updated_at ? new Date(ld.updated_at).getTime() : 0;
+            const cdTime = cd.updated_at ? new Date(cd.updated_at).getTime() : 0;
+            merged.push(ldTime > cdTime + 1000 ? ld : cd);
+            matchedCloudIds.add(ld.id);
+          } else if (isValidUUID(ld.id) && ld.created_at && (new Date().getTime() - new Date(ld.created_at).getTime() < 300000)) {
+            merged.push(ld);
+          }
         });
-        currentDues = Array.from(dMap.values());
+
+        cloudDues.forEach(cd => {
+          if (!matchedCloudIds.has(cd.id)) {
+            merged.push({
+              id: cd.id,
+              user_id: uid,
+              type: cd.type || "lent",
+              person_name: cd.person_name || "",
+              original_amount: Number(cd.original_amount) || 0,
+              amount_paid: Number(cd.amount_paid) || 0,
+              date: cd.date || todayStr(),
+              due_date: cd.due_date || null,
+              reason: cd.reason || "",
+              status: cd.status || "Pending",
+              created_at: cd.created_at || new Date().toISOString(),
+              updated_at: cd.updated_at || new Date().toISOString()
+            });
+          }
+        });
+
+        currentDues = merged;
       }
 
-      if (currentDues.length > 0) {
-        const duesToUpsert = currentDues.map(d => ({
-          id: isValidUUID(d.id) ? d.id : undefined,
+      const duesToUpsert = currentDues
+        .filter(d => d.id && isValidUUID(d.id))
+        .map(d => ({
+          id: d.id,
           user_id: uid,
           type: d.type || "lent",
           person_name: d.person_name,
@@ -652,8 +757,10 @@ function App() {
           reason: d.reason || "",
           status: d.status || "Pending",
           created_at: d.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: d.updated_at || new Date().toISOString()
         }));
+
+      if (duesToUpsert.length > 0) {
         const { data: upsertedDues } = await supabase.from("dues").upsert(duesToUpsert).select();
         if (upsertedDues && upsertedDues.length > 0) {
           const mapById = new Map(upsertedDues.map(ud => [ud.id, ud]));
