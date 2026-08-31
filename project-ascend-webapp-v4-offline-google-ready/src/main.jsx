@@ -364,6 +364,8 @@ function App() {
 
   const [local, setLocal, localReady, userId] = useUserLocalState(user);
 
+  const isSyncingRef = useRef(false);
+
   // Service worker registration, online & tab visibility listeners
   useEffect(() => {
     const handleOnline = () => setOnline(true);
@@ -373,7 +375,7 @@ function App() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && supabase && user && online) {
         const now = Date.now();
-        if (now - lastSyncTime > 10000) { // Throttle visibility sync to at most once per 10s
+        if (now - lastSyncTime > 15000) { // Throttle visibility sync to at most once per 15s
           lastSyncTime = now;
           syncWithCloud();
         }
@@ -408,7 +410,8 @@ function App() {
 
   // Supabase Cloud Synchronization Logic (Robust Bidirectional Cross-Device Sync)
   async function syncWithCloud() {
-    if (!supabase || !user || !online || !localReady) return;
+    if (!supabase || !user || !online || !localReady || isSyncingRef.current) return;
+    isSyncingRef.current = true;
     setSyncing(true);
     try {
       const uid = user.id;
@@ -436,7 +439,6 @@ function App() {
             merged.push(ltTime > ctTime + 1000 ? lt : ct);
             matchedCloudIds.add(lt.id);
           } else if (isValidUUID(lt.id) && lt.created_at && (new Date().getTime() - new Date(lt.created_at).getTime() < 300000)) {
-            // Newly created offline task (last 5 min)
             merged.push(lt);
           }
         });
@@ -450,9 +452,16 @@ function App() {
         currentTasks = merged;
       }
 
-      // Upsert un-synced or updated tasks
+      // Upsert ONLY tasks modified locally or created offline
       const tasksToUpsert = currentTasks
-        .filter(t => t.id && (typeof t.id !== "string" || !t.id.startsWith("starter-")))
+        .filter(t => {
+          if (!t.id || (typeof t.id === "string" && t.id.startsWith("starter-"))) return false;
+          const ct = cloudTasks?.find(c => c.id === t.id);
+          if (!ct) return true; // Offline new item
+          const ltTime = t.updated_at ? new Date(t.updated_at).getTime() : 0;
+          const ctTime = ct.updated_at ? new Date(ct.updated_at).getTime() : 0;
+          return ltTime > ctTime + 1000; // Local edit
+        })
         .map(t => ({
           id: isValidUUID(t.id) ? t.id : undefined,
           user_id: uid,
@@ -486,8 +495,9 @@ function App() {
         });
       }
 
+      const cloudCompSet = new Set((cloudCompletions || []).map(c => `${c.task_id}:${c.completed_on}`));
       const completionRows = Object.keys(completionsMap)
-        .filter(k => completionsMap[k])
+        .filter(k => completionsMap[k] && !cloudCompSet.has(k))
         .map(k => {
           const [task_id, completed_on] = k.split(":");
           return { user_id: uid, task_id, completed_on };
@@ -531,7 +541,14 @@ function App() {
       }
 
       const booksToUpsert = currentBooks
-        .filter(b => b.id && (typeof b.id !== "string" || !b.id.startsWith("book-")))
+        .filter(b => {
+          if (!b.id || (typeof b.id === "string" && b.id.startsWith("book-"))) return false;
+          const cb = cloudBooks?.find(c => c.id === b.id);
+          if (!cb) return true;
+          const lbTime = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+          const cbTime = cb.updated_at ? new Date(cb.updated_at).getTime() : 0;
+          return lbTime > cbTime + 1000;
+        })
         .map(b => ({
           id: isValidUUID(b.id) ? b.id : undefined,
           user_id: uid,
@@ -584,7 +601,14 @@ function App() {
       }
 
       const wishlistToUpsert = currentWishlist
-        .filter(w => w.id && (typeof w.id !== "string" || !w.id.startsWith("wish-")))
+        .filter(w => {
+          if (!w.id || (typeof w.id === "string" && w.id.startsWith("wish-"))) return false;
+          const cw = cloudWishlist?.find(c => c.id === w.id);
+          if (!cw) return true;
+          const lwTime = w.updated_at ? new Date(w.updated_at).getTime() : 0;
+          const cwTime = cw.updated_at ? new Date(cw.updated_at).getTime() : 0;
+          return lwTime > cwTime + 1000;
+        })
         .map(w => ({
           id: isValidUUID(w.id) ? w.id : undefined,
           user_id: uid,
@@ -632,7 +656,11 @@ function App() {
       }
 
       const conceptsToUpsert = currentConcepts
-        .filter(c => c.id && (typeof c.id !== "string" || !c.id.startsWith("concept-")))
+        .filter(c => {
+          if (!c.id || (typeof c.id === "string" && c.id.startsWith("concept-"))) return false;
+          const cc = cloudConcepts?.find(item => item.id === c.id);
+          return !cc; // Only upsert if not in cloud yet
+        })
         .map(c => ({
           id: isValidUUID(c.id) ? c.id : undefined,
           user_id: uid,
@@ -680,7 +708,14 @@ function App() {
       }
 
       const sqToUpsert = currentSideQuests
-        .filter(sq => sq.id && (typeof sq.id !== "string" || !sq.id.startsWith("sq-")))
+        .filter(sq => {
+          if (!sq.id || (typeof sq.id === "string" && sq.id.startsWith("sq-"))) return false;
+          const csq = cloudSideQuests?.find(c => c.id === sq.id);
+          if (!csq) return true;
+          const lsqTime = sq.completed_at ? new Date(sq.completed_at).getTime() : 0;
+          const csqTime = csq.completed_at ? new Date(csq.completed_at).getTime() : 0;
+          return lsqTime > csqTime + 1000;
+        })
         .map(sq => ({
           id: isValidUUID(sq.id) ? sq.id : undefined,
           user_id: uid,
@@ -747,7 +782,14 @@ function App() {
       }
 
       const duesToUpsert = currentDues
-        .filter(d => d.id && isValidUUID(d.id))
+        .filter(d => {
+          if (!d.id || !isValidUUID(d.id)) return false;
+          const cd = cloudDues?.find(c => c.id === d.id);
+          if (!cd) return true;
+          const ldTime = d.updated_at ? new Date(d.updated_at).getTime() : 0;
+          const cdTime = cd.updated_at ? new Date(cd.updated_at).getTime() : 0;
+          return ldTime > cdTime + 1000;
+        })
         .map(d => ({
           id: d.id,
           user_id: uid,
@@ -782,7 +824,7 @@ function App() {
         const hasDueChanges = JSON.stringify(s.dues) !== JSON.stringify(currentDues);
 
         if (!hasTaskChanges && !hasCompChanges && !hasBookChanges && !hasWishChanges && !hasConceptChanges && !hasSqChanges && !hasDueChanges) {
-          return s; // No changes, return existing state to prevent re-renders
+          return s;
         }
 
         return {
@@ -800,30 +842,40 @@ function App() {
       console.warn("Cloud sync deferred:", err);
     } finally {
       setSyncing(false);
+      setTimeout(() => {
+        isSyncingRef.current = false;
+      }, 2500); // Grace period to ignore Realtime echoes from our own sync
     }
   }
 
-  // Auto sync on initial load & set up Supabase Realtime channel subscription
+  // Auto sync on initial load & set up Supabase Realtime channel subscription with echo prevention
   useEffect(() => {
     if (!supabase || !user || !online || !localReady) return;
 
     // Trigger immediate sync on auth load / change
     syncWithCloud();
 
-    // Supabase Realtime Channel Listener
+    let realtimeDebounceTimer = null;
     const channel = supabase
       .channel(`public:user_${user.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", filter: `user_id=eq.${user.id}` },
         () => {
-          console.log("Cloud change detected from another device. Pulling changes...");
-          syncWithCloud();
+          if (isSyncingRef.current) return;
+          if (realtimeDebounceTimer) clearTimeout(realtimeDebounceTimer);
+          realtimeDebounceTimer = setTimeout(() => {
+            if (!isSyncingRef.current) {
+              console.log("Cloud change detected from another device. Pulling changes...");
+              syncWithCloud();
+            }
+          }, 3000);
         }
       )
       .subscribe();
 
     return () => {
+      if (realtimeDebounceTimer) clearTimeout(realtimeDebounceTimer);
       supabase.removeChannel(channel);
     };
   }, [user, online, localReady]);
