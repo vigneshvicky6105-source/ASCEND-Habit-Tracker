@@ -378,7 +378,9 @@ function App() {
     window.addEventListener("visibilitychange", handleVisibilityChange);
 
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      navigator.serviceWorker.register("/sw.js").then((reg) => {
+        reg.update();
+      }).catch(() => {});
     }
 
     if (supabase) {
