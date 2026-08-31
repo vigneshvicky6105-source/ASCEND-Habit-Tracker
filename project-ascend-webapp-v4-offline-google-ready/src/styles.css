@@ -2208,4 +2208,224 @@ button, input, select, textarea {
   opacity: 0.8;
 }
 
+/* ==========================================
+   DUES TRACKER (LENT & OWED) STYLES
+   ========================================== */
+.duesMetricsGrid {
+  grid-template-columns: repeat(4, 1fr);
+  margin-bottom: 24px;
+}
+
+@media (max-width: 900px) {
+  .duesMetricsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .duesMetricsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.duesGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .duesGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dueCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: all 0.2s ease;
+}
+
+.dueCard:hover {
+  border-color: rgba(245, 185, 66, 0.3);
+  transform: translateY(-2px);
+}
+
+.dueCard.isOverdue {
+  border-color: rgba(239, 68, 68, 0.4);
+  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.1);
+}
+
+.dueHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.duePersonName {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.dueBadgesRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.dueTypeTag {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dueTypeTag.lent {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.dueTypeTag.owed {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-danger);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.statusPill.pending {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--color-warning);
+}
+
+.statusPill.partiallypaid {
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--color-blue);
+}
+
+.statusPill.paid {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--color-success);
+}
+
+.overdueBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--color-danger);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  padding: 3px 8px;
+  border-radius: 12px;
+}
+
+.dueAmountBlock {
+  background: rgba(10, 13, 19, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  text-align: center;
+}
+
+.amountCol small {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.amountCol strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.amountCol.remaining strong {
+  color: var(--accent-gold);
+  font-size: 16px;
+}
+
+.dueDatesRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.dueReasonBlock {
+  font-size: 13px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent-gold);
+}
+
+.dueFooterActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.dueActionBtns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.markPaidBtn {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: var(--color-success);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+
+.markPaidBtn:hover {
+  background: rgba(16, 185, 129, 0.3);
+}
+
+.logPayBtn {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: var(--color-blue);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+
+.logPayBtn:hover {
+  background: rgba(59, 130, 246, 0.3);
+}
+
+
 

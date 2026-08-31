@@ -5,7 +5,8 @@ import {
   Check, Flame, Plus, Settings, BookOpen, LogIn, LogOut, WifiOff, Cloud,
   Pencil, Trash2, ArrowUp, ArrowDown, Lock, Unlock, Calendar, Trophy,
   BarChart2, Sparkles, X, ChevronRight, RefreshCw, ShoppingCart, Target,
-  Layers, CheckCircle2, Circle, Swords, Shield, Clock, CalendarDays, Bell, BellOff
+  Layers, CheckCircle2, Circle, Swords, Shield, Clock, CalendarDays, Bell, BellOff,
+  Wallet, ArrowUpRight, ArrowDownLeft
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart,
@@ -51,6 +52,10 @@ const STARTER_CHALLENGES = [
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const PRIORITY_ORDER = { "High": 1, "Medium": 2, "Low": 3 };
 
+function isValidUUID(str) {
+  return typeof str === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
 function getLevelRankTitle(level) {
   if (level <= 1) return { title: "Novice Ascendant", icon: "🌱", color: "#a0aec0" };
   if (level <= 3) return { title: "Disciplined Seeker", icon: "⚔️", color: "#48bb78" };
@@ -64,7 +69,7 @@ function getLevelRankTitle(level) {
 // --- INDEXEDDB MULTI-USER ISOLATED STORAGE ---
 const DB_NAME = "project_ascend_v4_db";
 const DB_VERSION = 4;
-const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus"];
+const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus", "dues"];
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -133,7 +138,8 @@ function useUserLocalState(user) {
     side_quests: [],
     ai_chat_history: [],
     challenges: [],
-    daily_focus: {}
+    daily_focus: {},
+    dues: []
   });
   const [ready, setReady] = useState(false);
 
@@ -144,7 +150,7 @@ function useUserLocalState(user) {
 
     async function load() {
       try {
-        let [tasks, completionsArr, books, wishlist, concepts, sideQuestsArr, chatHistoryArr, challengesArr, dailyFocusArr] = await Promise.all(
+        let [tasks, completionsArr, books, wishlist, concepts, sideQuestsArr, chatHistoryArr, challengesArr, dailyFocusArr, duesArr] = await Promise.all(
           STORES.map(s => idbGetUserRecords(s, userId))
         );
         if (!active) return;
@@ -156,12 +162,14 @@ function useUserLocalState(user) {
           const guestSideQuests = await idbGetUserRecords("side_quests", "guest");
           const guestBooks = await idbGetUserRecords("books", "guest");
           const guestWishlist = await idbGetUserRecords("wishlist", "guest");
+          const guestDues = await idbGetUserRecords("dues", "guest");
 
           const hasGuestData = (
             (guestCompletions && guestCompletions.length > 0) ||
             (guestSideQuests && guestSideQuests.length > 0) ||
             (guestBooks && guestBooks.length > 0) ||
             (guestWishlist && guestWishlist.length > 0) ||
+            (guestDues && guestDues.length > 0) ||
             (guestTasks && guestTasks.some(t => !t.id.startsWith("starter-")))
           );
 
@@ -202,13 +210,20 @@ function useUserLocalState(user) {
             (guestWishlist || []).forEach(gw => wMap.set(gw.id, { ...gw, user_id: userId }));
             wishlist = Array.from(wMap.values());
 
+            // Merge dues
+            const dMap = new Map();
+            (duesArr || []).forEach(d => dMap.set(d.id, d));
+            (guestDues || []).forEach(gd => dMap.set(gd.id, { ...gd, user_id: userId }));
+            duesArr = Array.from(dMap.values());
+
             // Persist migrated records to IndexedDB for logged-in user
             await Promise.all([
               idbSaveUserRecords("tasks", tasks, userId),
               idbSaveUserRecords("completions", completionsArr, userId),
               idbSaveUserRecords("side_quests", sideQuestsArr, userId),
               idbSaveUserRecords("books", books, userId),
-              idbSaveUserRecords("wishlist", wishlist, userId)
+              idbSaveUserRecords("wishlist", wishlist, userId),
+              idbSaveUserRecords("dues", duesArr, userId)
             ]);
           }
         }
@@ -222,7 +237,7 @@ function useUserLocalState(user) {
         let finalTasks = tasks;
         if (!finalTasks || finalTasks.length === 0) {
           finalTasks = STARTER_QUESTS.map((q, idx) => ({
-            id: `starter-${idx}`,
+            id: crypto.randomUUID(),
             user_id: userId,
             title: q.title,
             category: q.category,
@@ -238,7 +253,7 @@ function useUserLocalState(user) {
         let finalConcepts = concepts;
         if (!finalConcepts || finalConcepts.length === 0) {
           finalConcepts = STARTER_CONCEPTS.map((c, idx) => ({
-            id: `concept-${idx}`,
+            id: crypto.randomUUID(),
             user_id: userId,
             title: c.title,
             subtitle: c.subtitle,
@@ -265,7 +280,8 @@ function useUserLocalState(user) {
           side_quests: sideQuestsArr || [],
           ai_chat_history: chatHistoryArr || [],
           challenges: finalChallenges,
-          daily_focus: dailyFocusMap
+          daily_focus: dailyFocusMap,
+          dues: duesArr || []
         });
         setReady(true);
       } catch (err) {
@@ -308,7 +324,8 @@ function useUserLocalState(user) {
               user_id: userId
             })),
             userId
-          )
+          ),
+          idbSaveUserRecords("dues", state.dues || [], userId)
         ]);
       } catch (e) {
         console.error("Error saving state to IndexedDB:", e);
@@ -331,9 +348,11 @@ function App() {
   const [questModal, setQuestModal] = useState(null); // null | { isNew: bool, task: obj }
   const [bookModal, setBookModal] = useState(null); // null | { isNew: bool, book: obj }
   const [wishlistModal, setWishlistModal] = useState(null); // null | { isNew: bool, item: obj }
+  const [dueModal, setDueModal] = useState(null); // null | { isNew: bool, due?: obj, defaultType?: "lent"|"owed" }
   const [conceptModal, setConceptModal] = useState(null); // null | { isNew: bool, concept: obj }
   const [sideQuestModal, setSideQuestModal] = useState(null); // null | { isNew: bool, quest?: obj, defaultDate?: string }
   const [questSubTab, setQuestSubTab] = useState("main"); // "main" | "side"
+  const [dueSubTab, setDueSubTab] = useState("lent"); // "lent" | "owed"
   const [notifPermission, setNotifPermission] = useState(() => {
     try {
       return (typeof window !== "undefined" && "Notification" in window) ? Notification.permission : "default";
@@ -345,12 +364,18 @@ function App() {
 
   const [local, setLocal, localReady, userId] = useUserLocalState(user);
 
-  // Service worker registration & online listener
+  // Service worker registration, online & tab visibility listeners
   useEffect(() => {
     const handleOnline = () => setOnline(true);
     const handleOffline = () => setOnline(false);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && supabase && user && online) {
+        syncWithCloud();
+      }
+    };
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    window.addEventListener("visibilitychange", handleVisibilityChange);
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -362,123 +387,289 @@ function App() {
       return () => {
         window.removeEventListener("online", handleOnline);
         window.removeEventListener("offline", handleOffline);
+        window.removeEventListener("visibilitychange", handleVisibilityChange);
         data?.subscription?.unsubscribe();
       };
     }
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [user, online]);
 
-  // Supabase Cloud Synchronization Logic
+  // Supabase Cloud Synchronization Logic (Full Bidirectional Sync)
   async function syncWithCloud() {
     if (!supabase || !user || !online || !localReady) return;
     setSyncing(true);
     try {
       const uid = user.id;
 
-      // 1. Fetch Cloud Tasks
-      const { data: cloudTasks } = await supabase.from("tasks").select("*").eq("user_id", uid);
-      if (cloudTasks && cloudTasks.length > 0) {
-        // Merge strategy: map local & cloud tasks by id
-        const mergedMap = new Map();
-        local.tasks.forEach(t => mergedMap.set(t.id, t));
-        cloudTasks.forEach(ct => mergedMap.set(ct.id, ct));
-        const mergedTasks = Array.from(mergedMap.values());
-        setLocal(s => ({ ...s, tasks: mergedTasks }));
-      }
-      
-      // Upsert current local tasks to Supabase
-      if (local.tasks.length > 0) {
-        await supabase.from("tasks").upsert(
-          local.tasks.map(t => ({
-            id: t.id.startsWith("starter-") ? undefined : t.id,
-            user_id: uid,
-            title: t.title,
-            category: t.category,
-            target: t.target || "",
-            xp: t.xp || 10,
-            locked: !!t.locked,
-            active: t.active !== false,
-            sort_order: t.sort_order || 0
-          })),
-          { onConflict: "id" }
-        );
+      // 1. Fetch & Sync Tasks
+      const { data: cloudTasks, error: tasksErr } = await supabase.from("tasks").select("*").eq("user_id", uid);
+      let currentTasks = [...local.tasks];
+
+      if (!tasksErr && cloudTasks) {
+        if (cloudTasks.length > 0) {
+          const cloudMap = new Map();
+          cloudTasks.forEach(ct => cloudMap.set(ct.id, ct));
+
+          const mergedTasks = [];
+          const matchedCloudIds = new Set();
+
+          currentTasks.forEach(lt => {
+            if (lt.id && typeof lt.id === "string" && lt.id.startsWith("starter-")) {
+              const matchedByTitle = cloudTasks.find(ct => ct.title === lt.title);
+              if (matchedByTitle) {
+                mergedTasks.push(matchedByTitle);
+                matchedCloudIds.add(matchedByTitle.id);
+              }
+            } else if (cloudMap.has(lt.id)) {
+              mergedTasks.push(cloudMap.get(lt.id));
+              matchedCloudIds.add(lt.id);
+            } else {
+              mergedTasks.push(lt);
+            }
+          });
+
+          cloudTasks.forEach(ct => {
+            if (!matchedCloudIds.has(ct.id)) {
+              mergedTasks.push(ct);
+            }
+          });
+
+          currentTasks = mergedTasks;
+        }
       }
 
-      // 2. Task Completions Sync
-      const completionRows = Object.keys(local.completions)
-        .filter(k => local.completions[k])
+      // Filter tasks to upsert to cloud (only valid UUIDs)
+      const tasksToUpsert = currentTasks
+        .filter(t => t.id && (typeof t.id !== "string" || !t.id.startsWith("starter-")))
+        .map(t => ({
+          id: t.id,
+          user_id: uid,
+          title: t.title,
+          category: t.category || "Main Quest",
+          target: t.target || "",
+          xp: t.xp || 10,
+          locked: !!t.locked,
+          active: t.active !== false,
+          sort_order: t.sort_order || 0
+        }));
+
+      if (tasksToUpsert.length > 0) {
+        await supabase.from("tasks").upsert(tasksToUpsert, { onConflict: "id" });
+      }
+
+      // 2. Fetch & Sync Task Completions
+      const { data: cloudCompletions, error: compErr } = await supabase.from("task_completions").select("*").eq("user_id", uid);
+      const completionsMap = { ...local.completions };
+
+      if (!compErr && cloudCompletions) {
+        cloudCompletions.forEach(c => {
+          if (c.task_id && c.completed_on) {
+            completionsMap[`${c.task_id}:${c.completed_on}`] = true;
+          }
+        });
+      }
+
+      const completionRows = Object.keys(completionsMap)
+        .filter(k => completionsMap[k])
         .map(k => {
           const [task_id, completed_on] = k.split(":");
           return { user_id: uid, task_id, completed_on };
+        })
+        .filter(row => {
+          return row.task_id && typeof row.task_id === "string" && !row.task_id.startsWith("starter-");
         });
+
       if (completionRows.length > 0) {
         await supabase.from("task_completions").upsert(completionRows, {
           onConflict: "user_id,task_id,completed_on"
         });
       }
 
-      // 3. Books Sync
-      if (local.books.length > 0) {
-        await supabase.from("books").upsert(
-          local.books.map(b => ({
-            id: b.id.startsWith("book-") ? undefined : b.id,
-            user_id: uid,
-            title: b.title,
-            author: b.author || "",
-            start_date: b.start_date || null,
-            completed_date: b.completed_date || null,
-            current_page: b.current_page || 0,
-            total_pages: b.total_pages || 0,
-            status: b.status || "Reading",
-            notes: b.notes || ""
-          }))
-        );
+      // 3. Fetch & Sync Books
+      const { data: cloudBooks, error: bErr } = await supabase.from("books").select("*").eq("user_id", uid);
+      let currentBooks = [...local.books];
+
+      if (!bErr && cloudBooks) {
+        const bookMap = new Map();
+        currentBooks.forEach(b => {
+          if (typeof b.id !== "string" || !b.id.startsWith("book-")) bookMap.set(b.id, b);
+        });
+        cloudBooks.forEach(cb => bookMap.set(cb.id, cb));
+        currentBooks = Array.from(bookMap.values());
       }
 
-      // 4. Wishlist Sync
-      if (local.wishlist.length > 0) {
-        await supabase.from("wishlist").upsert(
-          local.wishlist.map(w => ({
-            id: w.id.startsWith("wish-") ? undefined : w.id,
-            user_id: uid,
-            item: w.item,
-            category: w.category || "General",
-            estimated_cost: w.estimated_cost || 0,
-            priority: w.priority || "Medium",
-            purchased: !!w.purchased,
-            notes: w.notes || ""
-          }))
-        );
+      const booksToUpsert = currentBooks
+        .filter(b => b.id && (typeof b.id !== "string" || !b.id.startsWith("book-")))
+        .map(b => ({
+          id: b.id,
+          user_id: uid,
+          title: b.title,
+          author: b.author || "",
+          start_date: b.start_date || null,
+          completed_date: b.completed_date || null,
+          current_page: b.current_page || 0,
+          total_pages: b.total_pages || 0,
+          status: b.status || "Reading",
+          notes: b.notes || ""
+        }));
+
+      if (booksToUpsert.length > 0) {
+        await supabase.from("books").upsert(booksToUpsert, { onConflict: "id" });
       }
 
-      // 5. Side Quests Sync
-      if (local.side_quests && local.side_quests.length > 0) {
-        const { data: cloudSideQuests } = await supabase.from("side_quests").select("*").eq("user_id", uid);
-        if (cloudSideQuests && cloudSideQuests.length > 0) {
-          const sqMap = new Map();
-          local.side_quests.forEach(sq => sqMap.set(sq.id, sq));
-          cloudSideQuests.forEach(csq => sqMap.set(csq.id, csq));
-          setLocal(s => ({ ...s, side_quests: Array.from(sqMap.values()) }));
+      // 4. Fetch & Sync Wishlist
+      const { data: cloudWishlist, error: wErr } = await supabase.from("wishlist").select("*").eq("user_id", uid);
+      let currentWishlist = [...local.wishlist];
+
+      if (!wErr && cloudWishlist) {
+        const wMap = new Map();
+        currentWishlist.forEach(w => {
+          if (typeof w.id !== "string" || !w.id.startsWith("wish-")) wMap.set(w.id, w);
+        });
+        cloudWishlist.forEach(cw => wMap.set(cw.id, cw));
+        currentWishlist = Array.from(wMap.values());
+      }
+
+      const wishlistToUpsert = currentWishlist
+        .filter(w => w.id && (typeof w.id !== "string" || !w.id.startsWith("wish-")))
+        .map(w => ({
+          id: w.id,
+          user_id: uid,
+          item: w.item,
+          category: w.category || "General",
+          estimated_cost: w.estimated_cost || 0,
+          priority: w.priority || "Medium",
+          purchased: !!w.purchased,
+          notes: w.notes || ""
+        }));
+
+      if (wishlistToUpsert.length > 0) {
+        await supabase.from("wishlist").upsert(wishlistToUpsert, { onConflict: "id" });
+      }
+
+      // 5. Fetch & Sync Core Concepts
+      const { data: cloudConcepts, error: cErr } = await supabase.from("core_concepts").select("*").eq("user_id", uid);
+      let currentConcepts = [...local.concepts];
+
+      if (!cErr && cloudConcepts) {
+        const cMap = new Map();
+        currentConcepts.forEach(c => {
+          if (typeof c.id !== "string" || !c.id.startsWith("concept-")) cMap.set(c.id, c);
+        });
+        cloudConcepts.forEach(cc => cMap.set(cc.id, cc));
+        currentConcepts = Array.from(cMap.values());
+      }
+
+      const conceptsToUpsert = currentConcepts
+        .filter(c => c.id && (typeof c.id !== "string" || !c.id.startsWith("concept-")))
+        .map(c => ({
+          id: c.id,
+          user_id: uid,
+          title: c.title,
+          subtitle: c.subtitle || "Daily learning target",
+          sort_order: c.sort_order || 0
+        }));
+
+      if (conceptsToUpsert.length > 0) {
+        await supabase.from("core_concepts").upsert(conceptsToUpsert, { onConflict: "id" });
+      }
+
+      // 6. Fetch & Sync Side Quests
+      const { data: cloudSideQuests, error: sqErr } = await supabase.from("side_quests").select("*").eq("user_id", uid);
+      let currentSideQuests = [...(local.side_quests || [])];
+
+      if (!sqErr && cloudSideQuests) {
+        const sqMap = new Map();
+        currentSideQuests.forEach(sq => {
+          if (typeof sq.id !== "string" || !sq.id.startsWith("sq-")) sqMap.set(sq.id, sq);
+        });
+        cloudSideQuests.forEach(csq => sqMap.set(csq.id, csq));
+        currentSideQuests = Array.from(sqMap.values());
+      }
+
+      const sqToUpsert = currentSideQuests
+        .filter(sq => sq.id && (typeof sq.id !== "string" || !sq.id.startsWith("sq-")))
+        .map(sq => ({
+          id: sq.id,
+          user_id: uid,
+          title: sq.title,
+          description: sq.description || "",
+          date: sq.date || todayStr(),
+          priority: sq.priority || "Medium",
+          due_time: sq.due_time || "",
+          category: sq.category || "General",
+          completed: !!sq.completed,
+          created_at: sq.created_at || new Date().toISOString(),
+          completed_at: sq.completed_at || null
+        }));
+
+      if (sqToUpsert.length > 0) {
+        await supabase.from("side_quests").upsert(sqToUpsert, { onConflict: "id" });
+      }
+
+      // 7. Fetch & Sync Dues
+      const { data: cloudDues, error: dErr } = await supabase.from("dues").select("*").eq("user_id", uid);
+      let currentDues = (local.dues || []).map(d => isValidUUID(d.id) ? d : { ...d, id: crypto.randomUUID() });
+
+      if (!dErr && cloudDues) {
+        const dMap = new Map();
+        currentDues.forEach(d => { if (isValidUUID(d.id)) dMap.set(d.id, d); });
+        cloudDues.forEach(cd => {
+          dMap.set(cd.id, {
+            id: cd.id,
+            user_id: uid,
+            type: cd.type || "lent",
+            person_name: cd.person_name || "",
+            original_amount: Number(cd.original_amount) || 0,
+            amount_paid: Number(cd.amount_paid) || 0,
+            date: cd.date || todayStr(),
+            due_date: cd.due_date || null,
+            reason: cd.reason || "",
+            status: cd.status || "Pending",
+            created_at: cd.created_at || new Date().toISOString(),
+            updated_at: cd.updated_at || new Date().toISOString()
+          });
+        });
+        currentDues = Array.from(dMap.values());
+      }
+
+      if (currentDues.length > 0) {
+        const duesToUpsert = currentDues.map(d => ({
+          id: isValidUUID(d.id) ? d.id : undefined,
+          user_id: uid,
+          type: d.type || "lent",
+          person_name: d.person_name,
+          original_amount: Number(d.original_amount) || 0,
+          amount_paid: Number(d.amount_paid) || 0,
+          date: d.date || todayStr(),
+          due_date: d.due_date || null,
+          reason: d.reason || "",
+          status: d.status || "Pending",
+          created_at: d.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }));
+        const { data: upsertedDues } = await supabase.from("dues").upsert(duesToUpsert).select();
+        if (upsertedDues && upsertedDues.length > 0) {
+          const mapById = new Map(upsertedDues.map(ud => [ud.id, ud]));
+          currentDues = currentDues.map(d => mapById.get(d.id) ? { ...d, ...mapById.get(d.id) } : d);
         }
-        await supabase.from("side_quests").upsert(
-          local.side_quests.map(sq => ({
-            id: (sq.id && !sq.id.startsWith("sq-")) ? sq.id : undefined,
-            user_id: uid,
-            title: sq.title,
-            description: sq.description || "",
-            date: sq.date || todayStr(),
-            priority: sq.priority || "Medium",
-            due_time: sq.due_time || "",
-            category: sq.category || "General",
-            completed: !!sq.completed,
-            created_at: sq.created_at || new Date().toISOString(),
-            completed_at: sq.completed_at || null
-          }))
-        );
       }
+
+      // Commit merged cloud state locally
+      setLocal(s => ({
+        ...s,
+        tasks: currentTasks,
+        completions: completionsMap,
+        books: currentBooks,
+        wishlist: currentWishlist,
+        concepts: currentConcepts,
+        side_quests: currentSideQuests,
+        dues: currentDues
+      }));
     } catch (err) {
       console.warn("Cloud sync deferred:", err);
     } finally {
@@ -486,13 +677,38 @@ function App() {
     }
   }
 
-  // Auto sync on state changes when online & logged in
+  // Auto sync on state changes & set up Supabase Realtime channel subscription
+  useEffect(() => {
+    if (!supabase || !user || !online || !localReady) return;
+
+    // Trigger immediate sync on auth load / change
+    syncWithCloud();
+
+    // Supabase Realtime Channel Listener
+    const channel = supabase
+      .channel(`public:user_${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", filter: `user_id=eq.${user.id}` },
+        () => {
+          console.log("Cloud change detected from another device. Pulling changes...");
+          syncWithCloud();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, online, localReady]);
+
+  // Debounced auto-sync when local state changes
   useEffect(() => {
     if (user && online && localReady) {
-      const timer = setTimeout(() => syncWithCloud(), 3000);
+      const timer = setTimeout(() => syncWithCloud(), 2500);
       return () => clearTimeout(timer);
     }
-  }, [user, online, localReady, local.tasks, local.completions, local.books, local.wishlist, local.side_quests]);
+  }, [user, online, localReady, local.tasks, local.completions, local.books, local.wishlist, local.concepts, local.side_quests, local.dues]);
 
   // Auth Handlers
   async function handleGoogleLogin() {
@@ -604,6 +820,9 @@ function App() {
         ...s,
         tasks: s.tasks.map(t => (t.id === taskId ? { ...t, active: false } : t))
       }));
+      if (supabase && user && isValidUUID(taskId)) {
+        supabase.from("tasks").update({ active: false }).eq("id", taskId).eq("user_id", user.id).then(() => {}).catch(() => {});
+      }
     }
   };
 
@@ -637,6 +856,9 @@ function App() {
         ...s,
         concepts: s.concepts.filter(c => c.id !== conceptId)
       }));
+      if (supabase && user && isValidUUID(conceptId)) {
+        supabase.from("core_concepts").delete().eq("id", conceptId).eq("user_id", user.id).then(() => {}).catch(() => {});
+      }
     }
   };
 
@@ -691,6 +913,9 @@ function App() {
         ...s,
         side_quests: (s.side_quests || []).filter(sq => sq.id !== sqId)
       }));
+      if (supabase && user && isValidUUID(sqId)) {
+        supabase.from("side_quests").delete().eq("id", sqId).eq("user_id", user.id).then(() => {}).catch(() => {});
+      }
     }
   };
 
@@ -934,9 +1159,22 @@ function App() {
         </div>
 
         <div className="headerRightGroup">
+          {user && online && (
+            <button
+              className="secondaryBtn smallBtn"
+              onClick={() => syncWithCloud()}
+              disabled={syncing}
+              title="Sync data with cloud now"
+              style={{ padding: "4px 10px", fontSize: "0.8rem", gap: "6px" }}
+            >
+              <RefreshCw size={13} className={syncing ? "spin" : ""} />
+              <span>{syncing ? "Syncing..." : "Sync Now"}</span>
+            </button>
+          )}
+
           <div className={`networkBadge ${online ? "online" : "offline"}`}>
             {online ? <Cloud size={14} /> : <WifiOff size={14} />}
-            <span>{online ? (syncing ? "Syncing..." : "Online Sync") : "Offline Vault"}</span>
+            <span>{online ? (syncing ? "Syncing..." : "Cloud Active") : "Offline Vault"}</span>
           </div>
 
           {user ? (
@@ -962,6 +1200,7 @@ function App() {
           { id: "quests", label: "Quests Center ⚔️", icon: <Swords size={16} /> },
           { id: "reading", label: "Reading Center", icon: <BookOpen size={16} /> },
           { id: "wishlist", label: "Wishlist", icon: <ShoppingCart size={16} /> },
+          { id: "dues", label: "Dues 💸", icon: <Wallet size={16} /> },
           { id: "analytics", label: "Analytics & Insights", icon: <BarChart2 size={16} /> },
           { id: "ai", label: "Ascend AI 🤖", icon: <Sparkles size={16} /> },
           { id: "history", label: "Quest History 📜", icon: <CalendarDays size={16} /> },
@@ -1086,6 +1325,24 @@ function App() {
         />
       )}
 
+      {tab === "dues" && (
+        <DuesView
+          dues={local.dues || []}
+          subTab={dueSubTab}
+          setSubTab={setDueSubTab}
+          setLocal={setLocal}
+          onOpenDueModal={setDueModal}
+          onDeleteDue={(dueId) => {
+            if (confirm("Are you sure you want to delete this due record?")) {
+              setLocal(s => ({ ...s, dues: (s.dues || []).filter(d => d.id !== dueId) }));
+              if (typeof supabase !== "undefined" && supabase && isValidUUID(dueId)) {
+                supabase.from("dues").delete().eq("id", dueId).then(() => {}).catch(() => {});
+              }
+            }
+          }}
+        />
+      )}
+
       {tab === "analytics" && (
         <AnalyticsView
           local={local}
@@ -1189,6 +1446,53 @@ function App() {
               }));
             }
             setWishlistModal(null);
+          }}
+        />
+      )}
+
+      {dueModal && (
+        <DueModal
+          modalData={dueModal}
+          onClose={() => setDueModal(null)}
+          onSave={(dueData) => {
+            const orig = Number(dueData.original_amount) || 0;
+            const paid = Number(dueData.amount_paid) || 0;
+            let status = dueData.status || "Pending";
+            if (paid >= orig && orig > 0) {
+              status = "Paid";
+            } else if (paid > 0) {
+              status = "Partially Paid";
+            } else {
+              status = "Pending";
+            }
+
+            if (dueData.isNew) {
+              const newDue = {
+                id: crypto.randomUUID(),
+                user_id: userId,
+                type: dueData.type || "lent",
+                person_name: dueData.person_name,
+                original_amount: orig,
+                amount_paid: paid,
+                date: dueData.date || todayStr(),
+                due_date: dueData.due_date || null,
+                reason: dueData.reason || "",
+                status,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+              setLocal(s => ({ ...s, dues: [...(s.dues || []), newDue] }));
+            } else {
+              setLocal(s => ({
+                ...s,
+                dues: (s.dues || []).map(d =>
+                  d.id === dueData.id
+                    ? { ...d, ...dueData, original_amount: orig, amount_paid: paid, status, updated_at: new Date().toISOString() }
+                    : d
+                )
+              }));
+            }
+            setDueModal(null);
           }}
         />
       )}
@@ -2563,6 +2867,9 @@ function ReadingView({ books, setLocal, onOpenBookModal, logReadingTenPages }) {
   const deleteBook = (bookId) => {
     if (confirm("Remove this book from your library?")) {
       setLocal(s => ({ ...s, books: s.books.filter(b => b.id !== bookId) }));
+      if (typeof supabase !== "undefined" && supabase && isValidUUID(bookId)) {
+        supabase.from("books").delete().eq("id", bookId).then(() => {}).catch(() => {});
+      }
     }
   };
 
@@ -2667,6 +2974,9 @@ function WishlistView({ wishlist, setLocal, onOpenWishlistModal }) {
   const deleteWishItem = (id) => {
     if (confirm("Remove item from wishlist?")) {
       setLocal(s => ({ ...s, wishlist: s.wishlist.filter(w => w.id !== id) }));
+      if (typeof supabase !== "undefined" && supabase && isValidUUID(id)) {
+        supabase.from("wishlist").delete().eq("id", id).then(() => {}).catch(() => {});
+      }
     }
   };
 
@@ -3729,5 +4039,445 @@ function WishlistModal({ modalData, onClose, onSave }) {
   );
 }
 
+// ==========================================
+// DUES TRACKER (LENT & OWED) VIEW COMPONENT
+// ==========================================
+function DuesView({ dues, subTab, setSubTab, setLocal, onOpenDueModal, onDeleteDue }) {
+  const today = todayStr();
+
+  // Filter dues by type (lent or owed)
+  const lentItems = useMemo(() => dues.filter(d => (d.type || "lent") === "lent"), [dues]);
+  const owedItems = useMemo(() => dues.filter(d => (d.type || "lent") === "owed"), [dues]);
+
+  // Calculations: Total Lent (outstanding), Total Owed (outstanding), Net Dues
+  const totalLent = useMemo(() => {
+    return lentItems
+      .filter(d => d.status !== "Paid")
+      .reduce((acc, d) => acc + Math.max(0, (Number(d.original_amount) || 0) - (Number(d.amount_paid) || 0)), 0);
+  }, [lentItems]);
+
+  const totalOwed = useMemo(() => {
+    return owedItems
+      .filter(d => d.status !== "Paid")
+      .reduce((acc, d) => acc + Math.max(0, (Number(d.original_amount) || 0) - (Number(d.amount_paid) || 0)), 0);
+  }, [owedItems]);
+
+  const netDues = totalLent - totalOwed;
+
+  // Overdue calculation
+  const overdueCount = useMemo(() => {
+    return dues.filter(d => {
+      if (d.status === "Paid" || !d.due_date) return false;
+      return d.due_date < today;
+    }).length;
+  }, [dues, today]);
+
+  const lentPendingCount = useMemo(() => lentItems.filter(d => d.status !== "Paid").length, [lentItems]);
+  const owedPendingCount = useMemo(() => owedItems.filter(d => d.status !== "Paid").length, [owedItems]);
+
+  const activeItems = subTab === "lent" ? lentItems : owedItems;
+
+  const markAsPaid = (due) => {
+    const orig = Number(due.original_amount) || 0;
+    setLocal(s => ({
+      ...s,
+      dues: (s.dues || []).map(d =>
+        d.id === due.id
+          ? { ...d, amount_paid: orig, status: "Paid", updated_at: new Date().toISOString() }
+          : d
+      )
+    }));
+  };
+
+  const handleQuickPayment = (due) => {
+    const orig = Number(due.original_amount) || 0;
+    const currentPaid = Number(due.amount_paid) || 0;
+    const remaining = Math.max(0, orig - currentPaid);
+
+    const input = prompt(`Record payment for ${due.person_name} (Remaining: ₹${remaining}):`, remaining);
+    if (input === null) return;
+    const addAmt = parseFloat(input);
+    if (isNaN(addAmt) || addAmt <= 0) return;
+
+    const newPaid = Math.min(orig, currentPaid + addAmt);
+    let newStatus = "Pending";
+    if (newPaid >= orig && orig > 0) newStatus = "Paid";
+    else if (newPaid > 0) newStatus = "Partially Paid";
+
+    setLocal(s => ({
+      ...s,
+      dues: (s.dues || []).map(d =>
+        d.id === due.id
+          ? { ...d, amount_paid: newPaid, status: newStatus, updated_at: new Date().toISOString() }
+          : d
+      )
+    }));
+  };
+
+  return (
+    <main className="viewContainer fade-in">
+      {/* PAGE HEADER */}
+      <div className="pageHeaderRow">
+        <div>
+          <div className="eyebrowText">
+            <Wallet size={13} /> FINANCIAL DUES OPERATING CENTER
+          </div>
+          <h2 className="pageTitle">DUES TRACKER 💸</h2>
+          <p className="pageSubtitle">
+            Track money lent to others and money owed to recipients with automatic remaining balance calculation, payment status, and overdue reminders.
+          </p>
+        </div>
+
+        <div className="headerBtnGroup">
+          <button className="primaryBtn" onClick={() => onOpenDueModal({ isNew: true, defaultType: subTab })}>
+            <Plus size={16} />
+            <span>{subTab === "lent" ? "+ Add Lent Record" : "+ Add Owed Record"}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* SUMMARY METRICS CARDS */}
+      <div className="metricsGrid duesMetricsGrid">
+        <div className="metricCard">
+          <div className="metricIcon gold"><ArrowUpRight size={22} /></div>
+          <div className="metricData">
+            <strong>₹{totalLent.toLocaleString("en-IN")}</strong>
+            <small>Total Outstanding Lent</small>
+          </div>
+        </div>
+
+        <div className="metricCard">
+          <div className="metricIcon flame"><ArrowDownLeft size={22} /></div>
+          <div className="metricData">
+            <strong>₹{totalOwed.toLocaleString("en-IN")}</strong>
+            <small>Total Outstanding Owed</small>
+          </div>
+        </div>
+
+        <div className="metricCard">
+          <div className={`metricIcon ${netDues >= 0 ? 'star' : 'flame'}`}>
+            <Wallet size={22} />
+          </div>
+          <div className="metricData">
+            <strong style={{ color: netDues >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
+              {netDues >= 0 ? `+₹${netDues.toLocaleString("en-IN")}` : `-₹${Math.abs(netDues).toLocaleString("en-IN")}`}
+            </strong>
+            <small>Net Dues (Lent - Owed)</small>
+          </div>
+        </div>
+
+        <div className="metricCard">
+          <div className="metricIcon book"><Clock size={22} /></div>
+          <div className="metricData">
+            <strong>{overdueCount}</strong>
+            <small>Overdue Entries</small>
+          </div>
+        </div>
+      </div>
+
+      {/* SUB-TABS NAVIGATION (Lent | Owed) */}
+      <div className="subNavTabsProminent" style={{ marginBottom: "20px" }}>
+        <button
+          className={`subNavBtnProminent ${subTab === "lent" ? "active" : ""}`}
+          onClick={() => setSubTab("lent")}
+        >
+          <ArrowUpRight size={16} />
+          <span>Lent (Money Owed to Me)</span>
+          {lentPendingCount > 0 && <span className="subBadgeCount">{lentPendingCount}</span>}
+        </button>
+        <button
+          className={`subNavBtnProminent ${subTab === "owed" ? "active" : ""}`}
+          onClick={() => setSubTab("owed")}
+        >
+          <ArrowDownLeft size={16} />
+          <span>Owed (Money I Owe)</span>
+          {owedPendingCount > 0 && <span className="subBadgeCount">{owedPendingCount}</span>}
+        </button>
+      </div>
+
+      {/* DUES CARDS GRID */}
+      <div className="duesGrid">
+        {activeItems.length === 0 ? (
+          <div className="glassPanel emptyState" style={{ gridColumn: "1 / -1", padding: "40px 20px", textAlign: "center" }}>
+            <h3>{subTab === "lent" ? "No money lent yet." : "Nothing owed yet."}</h3>
+            <p style={{ color: "var(--text-muted)", margin: "8px 0 16px" }}>
+              {subTab === "lent"
+                ? "Keep track of money you give to friends or colleagues."
+                : "Keep track of money you borrow or owe to recipients."}
+            </p>
+            <button className="primaryBtn" onClick={() => onOpenDueModal({ isNew: true, defaultType: subTab })}>
+              <Plus size={16} />
+              <span>{subTab === "lent" ? "+ Add Lent Record" : "+ Add Owed Record"}</span>
+            </button>
+          </div>
+        ) : (
+          activeItems.map((due) => {
+            const orig = Number(due.original_amount) || 0;
+            const paid = Number(due.amount_paid) || 0;
+            const remaining = Math.max(0, orig - paid);
+            const pct = orig > 0 ? Math.min(100, Math.round((paid / orig) * 100)) : 0;
+
+            let isOverdue = false;
+            let overdueDays = 0;
+            if (due.status !== "Paid" && due.due_date) {
+              const dTime = new Date(due.due_date).getTime();
+              const tTime = new Date(today).getTime();
+              if (dTime < tTime) {
+                isOverdue = true;
+                overdueDays = Math.max(1, Math.floor((tTime - dTime) / (1000 * 60 * 60 * 24)));
+              }
+            }
+
+            const statusClass = (due.status || "Pending").toLowerCase().replace(/\s+/g, "");
+
+            return (
+              <div key={due.id} className={`dueCard ${isOverdue ? "isOverdue" : ""}`}>
+                <div className="dueHeader">
+                  <div>
+                    <h3 className="duePersonName">{due.person_name}</h3>
+                    <div className="dueBadgesRow">
+                      <span className={`dueTypeTag ${due.type}`}>
+                        {due.type === "lent" ? "Lent" : "Owed"}
+                      </span>
+                      <span className={`statusPill ${statusClass}`}>
+                        {due.status || "Pending"}
+                      </span>
+                      {isOverdue && (
+                        <span className="overdueBadge">
+                          <Bell size={12} /> Overdue · {overdueDays} day{overdueDays > 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="cardActions">
+                    <button className="iconBtn small" onClick={() => onOpenDueModal({ isNew: false, due })}>
+                      <Pencil size={14} />
+                    </button>
+                    <button className="iconBtn small dangerHover" onClick={() => onDeleteDue(due.id)}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* FINANCIAL AMOUNTS BLOCK */}
+                <div className="dueAmountBlock">
+                  <div className="amountCol">
+                    <small>Original</small>
+                    <strong>₹{orig.toLocaleString("en-IN")}</strong>
+                  </div>
+                  <div className="amountCol">
+                    <small>Paid</small>
+                    <strong style={{ color: "var(--color-success)" }}>₹{paid.toLocaleString("en-IN")}</strong>
+                  </div>
+                  <div className="amountCol remaining">
+                    <small>Remaining</small>
+                    <strong>₹{remaining.toLocaleString("en-IN")}</strong>
+                  </div>
+                </div>
+
+                {/* PAYMENT PROGRESS BAR */}
+                <div className="bookProgressBlock">
+                  <div className="progressLabels">
+                    <span>Payment Progress ({pct}%)</span>
+                    <span>₹{paid.toLocaleString("en-IN")} / ₹{orig.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="progressBarTrack">
+                    <div className="progressBarFill" style={{ width: `${pct}%`, background: pct === 100 ? "var(--color-success)" : "var(--accent-gold)" }}></div>
+                  </div>
+                </div>
+
+                {/* DATES & REASON */}
+                <div className="dueDatesRow">
+                  <span>Given/Borrowed: {due.date || "N/A"}</span>
+                  {due.due_date && <span>Due Date: {due.due_date}</span>}
+                </div>
+
+                {due.reason && (
+                  <div className="dueReasonBlock">
+                    <strong>Note:</strong> {due.reason}
+                  </div>
+                )}
+
+                {/* FOOTER ACTIONS */}
+                <div className="dueFooterActions">
+                  <div className="dueActionBtns">
+                    {due.status !== "Paid" && (
+                      <>
+                        <button className="markPaidBtn" onClick={() => markAsPaid(due)}>
+                          <CheckCircle2 size={14} /> Mark Paid
+                        </button>
+                        <button className="logPayBtn" onClick={() => handleQuickPayment(due)}>
+                          <Plus size={14} /> Log Payment
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {due.status === "Paid" && (
+                    <span style={{ fontSize: "12px", color: "var(--color-success)", fontWeight: 700 }}>
+                      ✓ Fully Settled
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </main>
+  );
+}
+
+// ==========================================
+// DUES MODAL (ADD / EDIT LENT & OWED)
+// ==========================================
+function DueModal({ modalData, onClose, onSave }) {
+  const due = modalData.due || {};
+  const [personName, setPersonName] = useState(due.person_name || "");
+  const [type, setType] = useState(due.type || modalData.defaultType || "lent");
+  const [originalAmount, setOriginalAmount] = useState(due.original_amount !== undefined ? due.original_amount : "");
+  const [amountPaid, setAmountPaid] = useState(due.amount_paid !== undefined ? due.amount_paid : "0");
+  const [date, setDate] = useState(due.date || todayStr());
+  const [dueDate, setDueDate] = useState(due.due_date || "");
+  const [reason, setReason] = useState(due.reason || "");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setErrorMsg("");
+
+    if (!personName.trim()) {
+      setErrorMsg("Person or Recipient Name is required.");
+      return;
+    }
+
+    const orig = parseFloat(originalAmount);
+    if (isNaN(orig) || orig <= 0) {
+      setErrorMsg("Original amount must be greater than 0.");
+      return;
+    }
+
+    const paid = parseFloat(amountPaid) || 0;
+    if (paid < 0) {
+      setErrorMsg("Amount paid cannot be negative.");
+      return;
+    }
+
+    if (paid > orig) {
+      setErrorMsg("Amount paid cannot exceed original amount.");
+      return;
+    }
+
+    onSave({
+      isNew: modalData.isNew,
+      id: due.id,
+      person_name: personName.trim(),
+      type,
+      original_amount: orig,
+      amount_paid: paid,
+      date,
+      due_date: dueDate || null,
+      reason: reason.trim()
+    });
+  };
+
+  return (
+    <div className="modalBackdrop">
+      <div className="modalCard glassPanel">
+        <div className="modalHeader">
+          <h3>{modalData.isNew ? `Add New ${type === "lent" ? "Lent" : "Owed"} Entry` : "Edit Due Entry"}</h3>
+          <button className="iconBtn small" onClick={onClose}><X size={16} /></button>
+        </div>
+
+        {errorMsg && (
+          <div style={{ background: "rgba(239, 68, 68, 0.2)", border: "1px solid var(--color-danger)", color: "#fca5a5", padding: "10px 14px", borderRadius: "8px", fontSize: "13px", marginBottom: "14px" }}>
+            ⚠️ {errorMsg}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="modalForm">
+          <div className="formGroup">
+            <label>Person / Recipient Name *</label>
+            <input
+              type="text"
+              required
+              value={personName}
+              onChange={e => setPersonName(e.target.value)}
+              placeholder="e.g. Rahul Sharma"
+            />
+          </div>
+
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Due Type</label>
+              <select value={type} onChange={e => setType(e.target.value)} className="selectInput">
+                <option value="lent">Lent (Money Given to Others)</option>
+                <option value="owed">Owed (Money I Owe)</option>
+              </select>
+            </div>
+            <div className="formGroup">
+              <label>Total Amount (₹) *</label>
+              <input
+                type="number"
+                step="any"
+                required
+                value={originalAmount}
+                onChange={e => setOriginalAmount(e.target.value)}
+                placeholder="e.g. 5000"
+              />
+            </div>
+          </div>
+
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Amount Already Paid (₹)</label>
+              <input
+                type="number"
+                step="any"
+                value={amountPaid}
+                onChange={e => setAmountPaid(e.target.value)}
+                placeholder="e.g. 2000"
+              />
+            </div>
+            <div className="formGroup">
+              <label>Date Given / Borrowed</label>
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="formGroup">
+            <label>Due Date (Optional)</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={e => setDueDate(e.target.value)}
+            />
+          </div>
+
+          <div className="formGroup">
+            <label>Reason / Note</label>
+            <textarea
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="e.g. Dinner split, trip expense, loan..."
+              rows={3}
+            />
+          </div>
+
+          <div className="modalFooter">
+            <button type="button" className="secondaryBtn" onClick={onClose}>Cancel</button>
+            <button type="submit" className="primaryBtn">Save Entry</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // --- RENDER APPLICATION ---
 createRoot(document.getElementById("root")).render(<App />);
+

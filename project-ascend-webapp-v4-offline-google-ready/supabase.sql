@@ -135,3 +135,25 @@ alter table public.books add column if not exists notes text default '';
 alter table public.wishlist add column if not exists category text default 'General';
 alter table public.wishlist add column if not exists priority text default 'Medium';
 alter table public.wishlist add column if not exists notes text default '';
+
+-- 8. Dues (Lent & Owed Tracker)
+create table if not exists public.dues (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  type text not null check (type in ('lent', 'owed')),
+  person_name text not null,
+  original_amount numeric not null default 0,
+  amount_paid numeric not null default 0,
+  date date not null default CURRENT_DATE,
+  due_date date,
+  reason text default '',
+  status text not null default 'Pending' check (status in ('Pending', 'Partially Paid', 'Paid')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.dues enable row level security;
+
+drop policy if exists "dues own" on public.dues;
+create policy "dues own" on public.dues for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
