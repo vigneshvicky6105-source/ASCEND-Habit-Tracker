@@ -63,8 +63,8 @@ function getLevelRankTitle(level) {
 
 // --- INDEXEDDB MULTI-USER ISOLATED STORAGE ---
 const DB_NAME = "project_ascend_v4_db";
-const DB_VERSION = 4;
-const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus"];
+const DB_VERSION = 5;
+const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus", "dues"];
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -86,13 +86,14 @@ function openDB() {
 async function idbGetUserRecords(storeName, userId) {
   try {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    if (!db || !db.objectStoreNames || !db.objectStoreNames.contains(storeName)) return [];
+    return new Promise((resolve) => {
       const tx = db.transaction(storeName, "readonly");
       const store = tx.objectStore(storeName);
       const index = store.index("user_id");
       const req = index.getAll(userId);
       req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => reject(req.error);
+      req.onerror = () => resolve([]);
     });
   } catch {
     return [];
@@ -102,6 +103,7 @@ async function idbGetUserRecords(storeName, userId) {
 async function idbSaveUserRecords(storeName, records, userId) {
   try {
     const db = await openDB();
+    if (!db || !db.objectStoreNames || !db.objectStoreNames.contains(storeName)) return;
     const tx = db.transaction(storeName, "readwrite");
     const store = tx.objectStore(storeName);
     const index = store.index("user_id");
@@ -110,11 +112,13 @@ async function idbSaveUserRecords(storeName, records, userId) {
     getAllReq.onsuccess = () => {
       const existingKeys = getAllReq.result || [];
       existingKeys.forEach(k => store.delete(k));
-      records.forEach(r => store.put({ ...r, user_id: userId }));
+      (records || []).forEach(r => {
+        if (r) store.put({ ...r, user_id: userId });
+      });
     };
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      tx.onerror = () => resolve();
     });
   } catch (e) {
     console.error("IDB save error:", e);
@@ -133,7 +137,8 @@ function useUserLocalState(user) {
     side_quests: [],
     ai_chat_history: [],
     challenges: [],
-    daily_focus: {}
+    daily_focus: {},
+    dues: []
   });
   const [ready, setReady] = useState(false);
 
@@ -144,10 +149,21 @@ function useUserLocalState(user) {
 
     async function load() {
       try {
-        let [tasks, completionsArr, books, wishlist, concepts, sideQuestsArr, chatHistoryArr, challengesArr, dailyFocusArr] = await Promise.all(
+        let [tasks, completionsArr, books, wishlist, concepts, sideQuestsArr, chatHistoryArr, challengesArr, dailyFocusArr, duesArr] = await Promise.all(
           STORES.map(s => idbGetUserRecords(s, userId))
         );
         if (!active) return;
+
+        tasks = Array.isArray(tasks) ? tasks : [];
+        completionsArr = Array.isArray(completionsArr) ? completionsArr : [];
+        books = Array.isArray(books) ? books : [];
+        wishlist = Array.isArray(wishlist) ? wishlist : [];
+        concepts = Array.isArray(concepts) ? concepts : [];
+        sideQuestsArr = Array.isArray(sideQuestsArr) ? sideQuestsArr : [];
+        chatHistoryArr = Array.isArray(chatHistoryArr) ? chatHistoryArr : [];
+        challengesArr = Array.isArray(challengesArr) ? challengesArr : [];
+        dailyFocusArr = Array.isArray(dailyFocusArr) ? dailyFocusArr : [];
+        duesArr = Array.isArray(duesArr) ? duesArr : [];
 
         // AUTO-MIGRATE GUEST DATA TO LOGGED-IN USER ACCOUNT
         if (userId !== "guest") {
@@ -156,13 +172,15 @@ function useUserLocalState(user) {
           const guestSideQuests = await idbGetUserRecords("side_quests", "guest");
           const guestBooks = await idbGetUserRecords("books", "guest");
           const guestWishlist = await idbGetUserRecords("wishlist", "guest");
+          const guestDues = await idbGetUserRecords("dues", "guest");
 
           const hasGuestData = (
             (guestCompletions && guestCompletions.length > 0) ||
             (guestSideQuests && guestSideQuests.length > 0) ||
             (guestBooks && guestBooks.length > 0) ||
             (guestWishlist && guestWishlist.length > 0) ||
-            (guestTasks && guestTasks.some(t => !t.id.startsWith("starter-")))
+            (guestDues && guestDues.length > 0) ||
+            (guestTasks && guestTasks.some(t => t && t.id && typeof t.id === "string" && !t.id.startsWith("starter-")))
           );
 
           if (hasGuestData) {
@@ -170,37 +188,46 @@ function useUserLocalState(user) {
             
             // Merge tasks
             const taskMap = new Map();
-            (tasks || []).forEach(t => taskMap.set(t.title, t));
+            (tasks || []).forEach(t => { if (t && t.title) taskMap.set(t.title, t); });
             (guestTasks || []).forEach(gt => {
-              if (!gt.id.startsWith("starter-") || !taskMap.has(gt.title)) {
-                taskMap.set(gt.title, { ...gt, user_id: userId });
+              if (gt && gt.title) {
+                const isStarter = gt.id && typeof gt.id === "string" && gt.id.startsWith("starter-");
+                if (!isStarter || !taskMap.has(gt.title)) {
+                  taskMap.set(gt.title, { ...gt, user_id: userId });
+                }
               }
             });
             tasks = Array.from(taskMap.values());
 
             // Merge completions
             const compMap = new Map();
-            (completionsArr || []).forEach(c => compMap.set(c.key || `${c.task_id}:${c.completed_on}`, c));
-            (guestCompletions || []).forEach(gc => compMap.set(gc.key || `${gc.task_id}:${gc.completed_on}`, { ...gc, user_id: userId }));
+            (completionsArr || []).forEach(c => { if (c) compMap.set(c.key || `${c.task_id}:${c.completed_on}`, c); });
+            (guestCompletions || []).forEach(gc => { if (gc) compMap.set(gc.key || `${gc.task_id}:${gc.completed_on}`, { ...gc, user_id: userId }); });
             completionsArr = Array.from(compMap.values());
 
             // Merge side quests
             const sqMap = new Map();
-            (sideQuestsArr || []).forEach(sq => sqMap.set(sq.id, sq));
-            (guestSideQuests || []).forEach(gsq => sqMap.set(gsq.id, { ...gsq, user_id: userId }));
+            (sideQuestsArr || []).forEach(sq => { if (sq && sq.id) sqMap.set(sq.id, sq); });
+            (guestSideQuests || []).forEach(gsq => { if (gsq && gsq.id) sqMap.set(gsq.id, { ...gsq, user_id: userId }); });
             sideQuestsArr = Array.from(sqMap.values());
 
             // Merge books
             const bMap = new Map();
-            (books || []).forEach(b => bMap.set(b.id, b));
-            (guestBooks || []).forEach(gb => bMap.set(gb.id, { ...gb, user_id: userId }));
+            (books || []).forEach(b => { if (b && b.id) bMap.set(b.id, b); });
+            (guestBooks || []).forEach(gb => { if (gb && gb.id) bMap.set(gb.id, { ...gb, user_id: userId }); });
             books = Array.from(bMap.values());
 
             // Merge wishlist
             const wMap = new Map();
-            (wishlist || []).forEach(w => wMap.set(w.id, w));
-            (guestWishlist || []).forEach(gw => wMap.set(gw.id, { ...gw, user_id: userId }));
+            (wishlist || []).forEach(w => { if (w && w.id) wMap.set(w.id, w); });
+            (guestWishlist || []).forEach(gw => { if (gw && gw.id) wMap.set(gw.id, { ...gw, user_id: userId }); });
             wishlist = Array.from(wMap.values());
+
+            // Merge dues
+            const dMap = new Map();
+            (duesArr || []).forEach(d => { if (d && d.id) dMap.set(d.id, d); });
+            (guestDues || []).forEach(gd => { if (gd && gd.id) dMap.set(gd.id, { ...gd, user_id: userId }); });
+            duesArr = Array.from(dMap.values());
 
             // Persist migrated records to IndexedDB for logged-in user
             await Promise.all([
@@ -208,14 +235,17 @@ function useUserLocalState(user) {
               idbSaveUserRecords("completions", completionsArr, userId),
               idbSaveUserRecords("side_quests", sideQuestsArr, userId),
               idbSaveUserRecords("books", books, userId),
-              idbSaveUserRecords("wishlist", wishlist, userId)
+              idbSaveUserRecords("wishlist", wishlist, userId),
+              idbSaveUserRecords("dues", duesArr, userId)
             ]);
           }
         }
 
         const completionsMap = {};
-        completionsArr.forEach(c => {
-          completionsMap[c.key || `${c.task_id}:${c.completed_on}`] = true;
+        (completionsArr || []).forEach(c => {
+          if (c && (c.key || (c.task_id && c.completed_on))) {
+            completionsMap[c.key || `${c.task_id}:${c.completed_on}`] = true;
+          }
         });
 
         // Initialize defaults if user has zero tasks
@@ -253,19 +283,20 @@ function useUserLocalState(user) {
 
         const dailyFocusMap = {};
         (dailyFocusArr || []).forEach(f => {
-          if (f.date) dailyFocusMap[f.date] = f.goal;
+          if (f && f.date) dailyFocusMap[f.date] = f.goal;
         });
 
         setState({
           tasks: finalTasks,
           completions: completionsMap,
-          books,
-          wishlist,
+          books: books || [],
+          wishlist: wishlist || [],
           concepts: finalConcepts,
           side_quests: sideQuestsArr || [],
           ai_chat_history: chatHistoryArr || [],
           challenges: finalChallenges,
-          daily_focus: dailyFocusMap
+          daily_focus: dailyFocusMap,
+          dues: duesArr || []
         });
         setReady(true);
       } catch (err) {
@@ -308,7 +339,8 @@ function useUserLocalState(user) {
               user_id: userId
             })),
             userId
-          )
+          ),
+          idbSaveUserRecords("dues", state.dues || [], userId)
         ]);
       } catch (e) {
         console.error("Error saving state to IndexedDB:", e);
@@ -333,6 +365,7 @@ function App() {
   const [wishlistModal, setWishlistModal] = useState(null); // null | { isNew: bool, item: obj }
   const [conceptModal, setConceptModal] = useState(null); // null | { isNew: bool, concept: obj }
   const [sideQuestModal, setSideQuestModal] = useState(null); // null | { isNew: bool, quest?: obj, defaultDate?: string }
+  const [dueModal, setDueModal] = useState(null); // null | { isNew: bool, due?: obj, defaultType?: string }
   const [questSubTab, setQuestSubTab] = useState("main"); // "main" | "side"
   const [notifPermission, setNotifPermission] = useState(() => {
     try {
@@ -719,6 +752,142 @@ function App() {
     }));
   };
 
+  // --- DUES ACTIONS ---
+  const saveDueModal = (dueData) => {
+    if (dueData.isNew) {
+      const newDue = {
+        id: crypto.randomUUID(),
+        user_id: userId,
+        type: dueData.type || "lent",
+        person_name: dueData.person_name,
+        original_amount: Number(dueData.original_amount) || 0,
+        amount_paid: Number(dueData.amount_paid) || 0,
+        date: dueData.date || todayStr(),
+        due_date: dueData.due_date || null,
+        due_time: dueData.due_time || null,
+        notify_lead: dueData.notify_lead || "15m",
+        reason: dueData.reason || "",
+        status: dueData.status || "Pending",
+        created_at: new Date().toISOString()
+      };
+      setLocal(s => ({ ...s, dues: [...(s.dues || []), newDue] }));
+    } else {
+      setLocal(s => ({
+        ...s,
+        dues: (s.dues || []).map(d => (d.id === dueData.id ? { ...d, ...dueData } : d))
+      }));
+    }
+    setDueModal(null);
+  };
+
+  const deleteDue = (dueId) => {
+    if (confirm("Are you sure you want to delete this dues record?")) {
+      setLocal(s => ({
+        ...s,
+        dues: (s.dues || []).filter(d => d.id !== dueId)
+      }));
+    }
+  };
+
+  const logPaymentDue = (due) => {
+    const remaining = Math.max(0, (Number(due.original_amount) || 0) - (Number(due.amount_paid) || 0));
+    const input = prompt(`Enter payment amount received/paid for ${due.person_name} (Remaining: ₹${remaining}):`, remaining);
+    if (input === null) return;
+    const amount = Number(input);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Invalid payment amount.");
+      return;
+    }
+    const newPaid = (Number(due.amount_paid) || 0) + amount;
+    const isSettled = newPaid >= (Number(due.original_amount) || 0);
+    setLocal(s => ({
+      ...s,
+      dues: (s.dues || []).map(d =>
+        d.id === due.id
+          ? {
+              ...d,
+              amount_paid: newPaid,
+              status: isSettled ? "Settled" : "Pending"
+            }
+          : d
+      )
+    }));
+  };
+
+  const markSettledDue = (due) => {
+    if (confirm(`Mark due record for "${due.person_name}" as fully settled?`)) {
+      setLocal(s => ({
+        ...s,
+        dues: (s.dues || []).map(d =>
+          d.id === due.id
+            ? {
+                ...d,
+                amount_paid: Number(d.original_amount) || 0,
+                status: "Settled"
+              }
+            : d
+        )
+      }));
+    }
+  };
+
+  // --- PUSH NOTIFICATION REMINDERS FOR DUES (PRE-DUE DEADLINE) ---
+  useEffect(() => {
+    if (notifPermission !== "granted") return;
+    if (!local.dues || local.dues.length === 0) return;
+
+    const checkDueReminders = () => {
+      const now = new Date();
+      const activeDues = local.dues || [];
+
+      activeDues.forEach(d => {
+        if (d.status === "Settled" || !d.due_date) return;
+
+        const dueDateTimeStr = d.due_time ? `${d.due_date}T${d.due_time}` : `${d.due_date}T09:00`;
+        const dueTimeMs = new Date(dueDateTimeStr).getTime();
+        if (isNaN(dueTimeMs)) return;
+
+        let leadMs = 15 * 60 * 1000;
+        if (d.notify_lead === "1h") leadMs = 60 * 60 * 1000;
+        if (d.notify_lead === "1d") leadMs = 24 * 60 * 60 * 1000;
+        if (d.notify_lead === "none") return;
+
+        const triggerTimeMs = dueTimeMs - leadMs;
+        const diffMs = triggerTimeMs - now.getTime();
+
+        if (diffMs <= 0 && diffMs >= -120000) {
+          const storageKey = `due_notified_${d.id}_${d.due_date}_${d.due_time || ''}`;
+          if (!localStorage.getItem(storageKey)) {
+            localStorage.setItem(storageKey, "true");
+
+            const remaining = Math.max(0, (Number(d.original_amount) || 0) - (Number(d.amount_paid) || 0));
+            const title = d.type === "lent"
+              ? `💸 Money Lent Due: ${d.person_name}`
+              : `💸 Debt Due Reminder: ${d.person_name}`;
+            const body = `Remaining amount: ₹${remaining}. Due at ${d.due_time || d.due_date}. Open Ascend to log payment.`;
+            const options = {
+              body,
+              icon: "/icon-192.png",
+              badge: "/favicon-32.png",
+              tag: `due-reminder-${d.id}`,
+              renotify: true
+            };
+
+            if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+              navigator.serviceWorker.ready.then(reg => reg.showNotification(title, options));
+            } else if (typeof Notification !== "undefined") {
+              new Notification(title, options);
+            }
+          }
+        }
+      });
+    };
+
+    checkDueReminders();
+    const interval = setInterval(checkDueReminders, 20000);
+    return () => clearInterval(interval);
+  }, [local.dues, notifPermission]);
+
   // --- PUSH NOTIFICATION REMINDERS FOR SIDE QUESTS (10 MIN PRE-DUE) ---
   const requestNotificationPermission = async () => {
     if (typeof Notification === "undefined") {
@@ -962,6 +1131,7 @@ function App() {
           { id: "quests", label: "Quests Center ⚔️", icon: <Swords size={16} /> },
           { id: "reading", label: "Reading Center", icon: <BookOpen size={16} /> },
           { id: "wishlist", label: "Wishlist", icon: <ShoppingCart size={16} /> },
+          { id: "dues", label: "Dues 💸", icon: <Wallet size={16} /> },
           { id: "analytics", label: "Analytics & Insights", icon: <BarChart2 size={16} /> },
           { id: "ai", label: "Ascend AI 🤖", icon: <Sparkles size={16} /> },
           { id: "history", label: "Quest History 📜", icon: <CalendarDays size={16} /> },
@@ -1023,6 +1193,33 @@ function App() {
           onDeleteSideQuest={deleteSideQuest}
           notifPermission={notifPermission}
           requestNotificationPermission={requestNotificationPermission}
+        />
+      )}
+
+      {tab === "reading" && (
+        <ReadingView
+          books={local.books}
+          onOpenBookModal={setBookModal}
+          onDeleteBook={deleteBook}
+        />
+      )}
+
+      {tab === "wishlist" && (
+        <WishlistView
+          wishlist={local.wishlist}
+          onOpenWishlistModal={setWishlistModal}
+          onDeleteWishItem={deleteWishItem}
+          onTogglePurchased={toggleWishItemPurchased}
+        />
+      )}
+
+      {tab === "dues" && (
+        <DuesView
+          dues={local.dues || []}
+          onOpenDueModal={setDueModal}
+          onDeleteDue={deleteDue}
+          onLogPayment={logPaymentDue}
+          onMarkSettled={markSettledDue}
         />
       )}
 
@@ -1190,6 +1387,14 @@ function App() {
             }
             setWishlistModal(null);
           }}
+        />
+      )}
+
+      {dueModal && (
+        <DueModal
+          modalData={dueModal}
+          onClose={() => setDueModal(null)}
+          onSave={saveDueModal}
         />
       )}
 
@@ -3722,6 +3927,359 @@ function WishlistModal({ modalData, onClose, onSave }) {
           <div className="modalFooter">
             <button type="button" className="secondaryBtn" onClick={onClose}>Cancel</button>
             <button type="submit" className="primaryBtn">Save Item</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function DuesView({ dues, onOpenDueModal, onDeleteDue, onLogPayment, onMarkSettled }) {
+  const [subTab, setSubTab] = useState("lent"); // "lent" | "owed"
+
+  const safeDues = useMemo(() => Array.isArray(dues) ? dues : [], [dues]);
+
+  const lentItems = useMemo(() => safeDues.filter(d => (d.type || "lent") === "lent"), [safeDues]);
+  const owedItems = useMemo(() => safeDues.filter(d => (d.type || "lent") === "owed"), [safeDues]);
+
+  const totalLent = useMemo(() => {
+    return lentItems
+      .filter(d => d.status !== "Settled")
+      .reduce((sum, d) => sum + Math.max(0, (Number(d.original_amount) || 0) - (Number(d.amount_paid) || 0)), 0);
+  }, [lentItems]);
+
+  const totalOwed = useMemo(() => {
+    return owedItems
+      .filter(d => d.status !== "Settled")
+      .reduce((sum, d) => sum + Math.max(0, (Number(d.original_amount) || 0) - (Number(d.amount_paid) || 0)), 0);
+  }, [owedItems]);
+
+  const netDues = totalLent - totalOwed;
+
+  const today = todayStr();
+  const overdueCount = useMemo(() => {
+    return safeDues.filter(d => d.status !== "Settled" && d.due_date && d.due_date < today).length;
+  }, [safeDues, today]);
+
+  const activeItems = subTab === "lent" ? lentItems : owedItems;
+
+  return (
+    <div className="viewContainer">
+      <div className="viewHeader">
+        <div>
+          <h2>Financial Dues 💸</h2>
+          <p className="subtitle">Track money lent to others and debts owed, with automated deadline push reminders.</p>
+        </div>
+        <button className="primaryBtn" onClick={() => onOpenDueModal({ isNew: true, defaultType: subTab })}>
+          <Plus size={16} />
+          <span>Add Due Entry</span>
+        </button>
+      </div>
+
+      {/* METRICS SUMMARY CARDS */}
+      <div className="analyticsGrid">
+        <div className="statCard glassPanel">
+          <div className="statHeader">
+            <span className="statTitle">Total Lent (Money Owed to Me)</span>
+            <ArrowUpRight size={18} className="textSuccess" />
+          </div>
+          <div className="statValue textSuccess">₹{totalLent.toLocaleString()}</div>
+          <span className="statSub">{lentItems.filter(d => d.status !== "Settled").length} active lent records</span>
+        </div>
+
+        <div className="statCard glassPanel">
+          <div className="statHeader">
+            <span className="statTitle">Total Debts (Money I Owe)</span>
+            <ArrowDownLeft size={18} className="textDanger" />
+          </div>
+          <div className="statValue textDanger">₹{totalOwed.toLocaleString()}</div>
+          <span className="statSub">{owedItems.filter(d => d.status !== "Settled").length} active debt records</span>
+        </div>
+
+        <div className="statCard glassPanel">
+          <div className="statHeader">
+            <span className="statTitle">Net Dues Balance</span>
+            <Wallet size={18} style={{ color: netDues >= 0 ? "#48bb78" : "#f56565" }} />
+          </div>
+          <div className="statValue" style={{ color: netDues >= 0 ? "#48bb78" : "#f56565" }}>
+            {netDues >= 0 ? `+₹${netDues.toLocaleString()}` : `-₹${Math.abs(netDues).toLocaleString()}`}
+          </div>
+          <span className="statSub">{netDues >= 0 ? "You are net positive" : "You have net debt"}</span>
+        </div>
+
+        <div className="statCard glassPanel">
+          <div className="statHeader">
+            <span className="statTitle">Overdue Entries</span>
+            <Clock size={18} style={{ color: overdueCount > 0 ? "#e53e3e" : "#a0aec0" }} />
+          </div>
+          <div className="statValue" style={{ color: overdueCount > 0 ? "#e53e3e" : "#a0aec0" }}>
+            {overdueCount}
+          </div>
+          <span className="statSub">{overdueCount > 0 ? "Requires attention!" : "All payments on track"}</span>
+        </div>
+      </div>
+
+      {/* SUB-TABS NAVIGATION */}
+      <div className="subTabHeader" style={{ marginTop: "24px" }}>
+        <button
+          className={`subTabBtn ${subTab === "lent" ? "active" : ""}`}
+          onClick={() => setSubTab("lent")}
+        >
+          <ArrowUpRight size={16} />
+          <span>Lends (Money I Lent - ₹{totalLent.toLocaleString()})</span>
+        </button>
+        <button
+          className={`subTabBtn ${subTab === "owed" ? "active" : ""}`}
+          onClick={() => setSubTab("owed")}
+        >
+          <ArrowDownLeft size={16} />
+          <span>Debts (Money I Owe - ₹{totalOwed.toLocaleString()})</span>
+        </button>
+      </div>
+
+      {/* DUES LIST */}
+      <div className="itemsGrid" style={{ marginTop: "20px" }}>
+        {activeItems.length === 0 ? (
+          <div className="emptyState glassPanel">
+            <Wallet size={40} style={{ opacity: 0.5, marginBottom: "12px" }} />
+            <p>No {subTab === "lent" ? "lent money" : "debt"} records documented yet.</p>
+            <button className="secondaryBtn" style={{ marginTop: "12px" }} onClick={() => onOpenDueModal({ isNew: true, defaultType: subTab })}>
+              + Add {subTab === "lent" ? "Lend" : "Debt"} Record
+            </button>
+          </div>
+        ) : (
+          activeItems.map(d => {
+            const original = Number(d.original_amount) || 0;
+            const paid = Number(d.amount_paid) || 0;
+            const remaining = Math.max(0, original - paid);
+            const pct = original > 0 ? Math.min(100, Math.round((paid / original) * 100)) : 0;
+            const isSettled = d.status === "Settled" || remaining === 0;
+            const isOverdue = !isSettled && d.due_date && d.due_date < today;
+
+            return (
+              <div key={d.id} className="questCard glassPanel" style={{ position: "relative" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                  <div>
+                    <h3 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>{d.person_name}</h3>
+                    {d.reason && <p style={{ color: "#a0aec0", fontSize: "0.85rem", margin: "4px 0 0 0" }}>{d.reason}</p>}
+                  </div>
+                  <span className={`tag ${isSettled ? "success" : isOverdue ? "danger" : "warning"}`}>
+                    {isSettled ? "Settled ✓" : isOverdue ? "Overdue ⚠️" : "Pending"}
+                  </span>
+                </div>
+
+                <div className="moneyBreakdown" style={{ display: "flex", gap: "16px", background: "rgba(255,255,255,0.03)", padding: "10px", borderRadius: "8px", margin: "12px 0" }}>
+                  <div>
+                    <div style={{ fontSize: "0.75rem", color: "#a0aec0" }}>Original</div>
+                    <div style={{ fontWeight: 600 }}>₹{original.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "0.75rem", color: "#a0aec0" }}>Paid</div>
+                    <div style={{ fontWeight: 600, color: "#48bb78" }}>₹{paid.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "0.75rem", color: "#a0aec0" }}>Remaining</div>
+                    <div style={{ fontWeight: 700, color: remaining > 0 ? "#f56565" : "#48bb78" }}>₹{remaining.toLocaleString()}</div>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="progressBarBg" style={{ height: "6px", borderRadius: "3px", overflow: "hidden", marginBottom: "12px" }}>
+                  <div className="progressBarFill" style={{ width: `${pct}%`, height: "100%", background: isSettled ? "#48bb78" : "#f5b942" }} />
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.8rem", color: "#a0aec0", marginBottom: "12px" }}>
+                  <span>Given: {d.date || "N/A"}</span>
+                  {d.due_date && (
+                    <span style={{ color: isOverdue ? "#e53e3e" : "#f5b942", fontWeight: isOverdue ? 700 : 500 }}>
+                      Due: {d.due_date} {d.due_time ? `@ ${d.due_time}` : ""}
+                    </span>
+                  )}
+                </div>
+
+                <div className="cardActions" style={{ display: "flex", gap: "8px" }}>
+                  {!isSettled && (
+                    <>
+                      <button className="secondaryBtn small" onClick={() => onLogPayment(d)}>
+                        Log Payment
+                      </button>
+                      <button className="primaryBtn small" onClick={() => onMarkSettled(d)}>
+                        Mark Settled ✓
+                      </button>
+                    </>
+                  )}
+                  <button className="iconBtn small" onClick={() => onOpenDueModal({ isNew: false, due: d })} title="Edit Entry">
+                    <Pencil size={14} />
+                  </button>
+                  <button className="iconBtn small dangerHover" onClick={() => onDeleteDue(d.id)} title="Delete Entry">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DueModal({ modalData, onClose, onSave }) {
+  const due = modalData.due || {};
+  const [type, setType] = useState(due.type || modalData.defaultType || "lent");
+  const [personName, setPersonName] = useState(due.person_name || "");
+  const [originalAmount, setOriginalAmount] = useState(due.original_amount || "");
+  const [amountPaid, setAmountPaid] = useState(due.amount_paid || 0);
+  const [date, setDate] = useState(due.date || todayStr());
+  const [dueDate, setDueDate] = useState(due.due_date || "");
+  const [dueTime, setDueTime] = useState(due.due_time || "");
+  const [notifyLead, setNotifyLead] = useState(due.notify_lead || "15m");
+  const [reason, setReason] = useState(due.reason || "");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!personName.trim() || !originalAmount || Number(originalAmount) <= 0) {
+      alert("Please provide a valid person name and positive original amount.");
+      return;
+    }
+
+    onSave({
+      isNew: modalData.isNew,
+      id: due.id,
+      type,
+      person_name: personName.trim(),
+      original_amount: Number(originalAmount),
+      amount_paid: Number(amountPaid) || 0,
+      date,
+      due_date: dueDate || null,
+      due_time: dueTime || null,
+      notify_lead: notifyLead,
+      reason: reason.trim(),
+      status: Number(amountPaid) >= Number(originalAmount) ? "Settled" : "Pending"
+    });
+  };
+
+  return (
+    <div className="modalBackdrop">
+      <div className="modalCard glassPanel">
+        <div className="modalHeader">
+          <h3>{modalData.isNew ? "Add Dues Record" : "Edit Dues Record"}</h3>
+          <button className="iconBtn small" onClick={onClose}><X size={16} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="modalForm">
+          <div className="formGroup">
+            <label>Entry Type</label>
+            <div className="subTabHeader" style={{ padding: "4px" }}>
+              <button
+                type="button"
+                className={`subTabBtn ${type === "lent" ? "active" : ""}`}
+                onClick={() => setType("lent")}
+              >
+                <ArrowUpRight size={14} />
+                <span>Lend (Money I Lent)</span>
+              </button>
+              <button
+                type="button"
+                className={`subTabBtn ${type === "owed" ? "active" : ""}`}
+                onClick={() => setType("owed")}
+              >
+                <ArrowDownLeft size={14} />
+                <span>Debt (Money I Owe)</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="formGroup">
+            <label>Person Name *</label>
+            <input
+              type="text"
+              required
+              value={personName}
+              onChange={e => setPersonName(e.target.value)}
+              placeholder="e.g. John Doe, Alex..."
+            />
+          </div>
+
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Original Amount (₹) *</label>
+              <input
+                type="number"
+                required
+                min="1"
+                value={originalAmount}
+                onChange={e => setOriginalAmount(e.target.value)}
+                placeholder="e.g. 1500"
+              />
+            </div>
+            <div className="formGroup">
+              <label>Amount Already Paid (₹)</label>
+              <input
+                type="number"
+                min="0"
+                value={amountPaid}
+                onChange={e => setAmountPaid(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+          </div>
+
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Date Given</label>
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+              />
+            </div>
+            <div className="formGroup">
+              <label>Due Date</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={e => setDueDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Due Time</label>
+              <input
+                type="time"
+                value={dueTime}
+                onChange={e => setDueTime(e.target.value)}
+              />
+            </div>
+            <div className="formGroup">
+              <label>Push Notification Reminder</label>
+              <select
+                value={notifyLead}
+                onChange={e => setNotifyLead(e.target.value)}
+                className="selectInput"
+              >
+                <option value="15m">15 minutes before due</option>
+                <option value="1h">1 hour before due</option>
+                <option value="1d">1 day before due</option>
+                <option value="none">Disabled</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="formGroup">
+            <label>Reason / Note</label>
+            <textarea
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="e.g. Dinner split, trip expense, loan..."
+              rows={3}
+            />
+          </div>
+
+          <div className="modalFooter">
+            <button type="button" className="secondaryBtn" onClick={onClose}>Cancel</button>
+            <button type="submit" className="primaryBtn">Save Entry</button>
           </div>
         </form>
       </div>
