@@ -72,33 +72,38 @@ const DB_VERSION = 5;
 const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus", "dues"];
 
 function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      STORES.forEach(s => {
-        if (!db.objectStoreNames.contains(s)) {
-          const store = db.createObjectStore(s, { keyPath: "id" });
-          store.createIndex("user_id", "user_id", { unique: false });
-        }
-      });
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        STORES.forEach(s => {
+          if (!db.objectStoreNames.contains(s)) {
+            const store = db.createObjectStore(s, { keyPath: "id" });
+            store.createIndex("user_id", "user_id", { unique: false });
+          }
+        });
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+      req.onblocked = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
   });
 }
 
 async function idbGetUserRecords(storeName, userId) {
   try {
     const db = await openDB();
-    if (!db.objectStoreNames.contains(storeName)) return [];
-    return new Promise((resolve, reject) => {
+    if (!db || !db.objectStoreNames || !db.objectStoreNames.contains(storeName)) return [];
+    return new Promise((resolve) => {
       const tx = db.transaction(storeName, "readonly");
       const store = tx.objectStore(storeName);
       const index = store.index("user_id");
       const req = index.getAll(userId);
       req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => reject(req.error);
+      req.onerror = () => resolve([]);
     });
   } catch {
     return [];
@@ -108,7 +113,7 @@ async function idbGetUserRecords(storeName, userId) {
 async function idbSaveUserRecords(storeName, records, userId) {
   try {
     const db = await openDB();
-    if (!db.objectStoreNames.contains(storeName)) return;
+    if (!db || !db.objectStoreNames || !db.objectStoreNames.contains(storeName)) return;
     const tx = db.transaction(storeName, "readwrite");
     const store = tx.objectStore(storeName);
     const index = store.index("user_id");
@@ -117,11 +122,13 @@ async function idbSaveUserRecords(storeName, records, userId) {
     getAllReq.onsuccess = () => {
       const existingKeys = getAllReq.result || [];
       existingKeys.forEach(k => store.delete(k));
-      records.forEach(r => store.put({ ...r, user_id: userId }));
+      (records || []).forEach(r => {
+        if (r) store.put({ ...r, user_id: userId });
+      });
     };
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      tx.onerror = () => resolve();
     });
   } catch (e) {
     console.error("IDB save error:", e);
@@ -157,6 +164,17 @@ function useUserLocalState(user) {
         );
         if (!active) return;
 
+        tasks = Array.isArray(tasks) ? tasks : [];
+        completionsArr = Array.isArray(completionsArr) ? completionsArr : [];
+        books = Array.isArray(books) ? books : [];
+        wishlist = Array.isArray(wishlist) ? wishlist : [];
+        concepts = Array.isArray(concepts) ? concepts : [];
+        sideQuestsArr = Array.isArray(sideQuestsArr) ? sideQuestsArr : [];
+        chatHistoryArr = Array.isArray(chatHistoryArr) ? chatHistoryArr : [];
+        challengesArr = Array.isArray(challengesArr) ? challengesArr : [];
+        dailyFocusArr = Array.isArray(dailyFocusArr) ? dailyFocusArr : [];
+        duesArr = Array.isArray(duesArr) ? duesArr : [];
+
         // AUTO-MIGRATE GUEST DATA TO LOGGED-IN USER ACCOUNT
         if (userId !== "guest") {
           const guestTasks = await idbGetUserRecords("tasks", "guest");
@@ -172,7 +190,7 @@ function useUserLocalState(user) {
             (guestBooks && guestBooks.length > 0) ||
             (guestWishlist && guestWishlist.length > 0) ||
             (guestDues && guestDues.length > 0) ||
-            (guestTasks && guestTasks.some(t => !t.id.startsWith("starter-")))
+            (guestTasks && guestTasks.some(t => t && t.id && typeof t.id === "string" && !t.id.startsWith("starter-")))
           );
 
           if (hasGuestData) {
@@ -180,42 +198,45 @@ function useUserLocalState(user) {
             
             // Merge tasks
             const taskMap = new Map();
-            (tasks || []).forEach(t => taskMap.set(t.title, t));
+            (tasks || []).forEach(t => { if (t && t.title) taskMap.set(t.title, t); });
             (guestTasks || []).forEach(gt => {
-              if (!gt.id.startsWith("starter-") || !taskMap.has(gt.title)) {
-                taskMap.set(gt.title, { ...gt, user_id: userId });
+              if (gt && gt.title) {
+                const isStarter = gt.id && typeof gt.id === "string" && gt.id.startsWith("starter-");
+                if (!isStarter || !taskMap.has(gt.title)) {
+                  taskMap.set(gt.title, { ...gt, user_id: userId });
+                }
               }
             });
             tasks = Array.from(taskMap.values());
 
             // Merge completions
             const compMap = new Map();
-            (completionsArr || []).forEach(c => compMap.set(c.key || `${c.task_id}:${c.completed_on}`, c));
-            (guestCompletions || []).forEach(gc => compMap.set(gc.key || `${gc.task_id}:${gc.completed_on}`, { ...gc, user_id: userId }));
+            (completionsArr || []).forEach(c => { if (c) compMap.set(c.key || `${c.task_id}:${c.completed_on}`, c); });
+            (guestCompletions || []).forEach(gc => { if (gc) compMap.set(gc.key || `${gc.task_id}:${gc.completed_on}`, { ...gc, user_id: userId }); });
             completionsArr = Array.from(compMap.values());
 
             // Merge side quests
             const sqMap = new Map();
-            (sideQuestsArr || []).forEach(sq => sqMap.set(sq.id, sq));
-            (guestSideQuests || []).forEach(gsq => sqMap.set(gsq.id, { ...gsq, user_id: userId }));
+            (sideQuestsArr || []).forEach(sq => { if (sq && sq.id) sqMap.set(sq.id, sq); });
+            (guestSideQuests || []).forEach(gsq => { if (gsq && gsq.id) sqMap.set(gsq.id, { ...gsq, user_id: userId }); });
             sideQuestsArr = Array.from(sqMap.values());
 
             // Merge books
             const bMap = new Map();
-            (books || []).forEach(b => bMap.set(b.id, b));
-            (guestBooks || []).forEach(gb => bMap.set(gb.id, { ...gb, user_id: userId }));
+            (books || []).forEach(b => { if (b && b.id) bMap.set(b.id, b); });
+            (guestBooks || []).forEach(gb => { if (gb && gb.id) bMap.set(gb.id, { ...gb, user_id: userId }); });
             books = Array.from(bMap.values());
 
             // Merge wishlist
             const wMap = new Map();
-            (wishlist || []).forEach(w => wMap.set(w.id, w));
-            (guestWishlist || []).forEach(gw => wMap.set(gw.id, { ...gw, user_id: userId }));
+            (wishlist || []).forEach(w => { if (w && w.id) wMap.set(w.id, w); });
+            (guestWishlist || []).forEach(gw => { if (gw && gw.id) wMap.set(gw.id, { ...gw, user_id: userId }); });
             wishlist = Array.from(wMap.values());
 
             // Merge dues
             const dMap = new Map();
-            (duesArr || []).forEach(d => dMap.set(d.id, d));
-            (guestDues || []).forEach(gd => dMap.set(gd.id, { ...gd, user_id: userId }));
+            (duesArr || []).forEach(d => { if (d && d.id) dMap.set(d.id, d); });
+            (guestDues || []).forEach(gd => { if (gd && gd.id) dMap.set(gd.id, { ...gd, user_id: userId }); });
             duesArr = Array.from(dMap.values());
 
             // Persist migrated records to IndexedDB for logged-in user
@@ -231,8 +252,10 @@ function useUserLocalState(user) {
         }
 
         const completionsMap = {};
-        completionsArr.forEach(c => {
-          completionsMap[c.key || `${c.task_id}:${c.completed_on}`] = true;
+        (completionsArr || []).forEach(c => {
+          if (c && (c.key || (c.task_id && c.completed_on))) {
+            completionsMap[c.key || `${c.task_id}:${c.completed_on}`] = true;
+          }
         });
 
         // Initialize defaults if user has zero tasks
@@ -270,14 +293,14 @@ function useUserLocalState(user) {
 
         const dailyFocusMap = {};
         (dailyFocusArr || []).forEach(f => {
-          if (f.date) dailyFocusMap[f.date] = f.goal;
+          if (f && f.date) dailyFocusMap[f.date] = f.goal;
         });
 
         setState({
           tasks: finalTasks,
           completions: completionsMap,
-          books,
-          wishlist,
+          books: books || [],
+          wishlist: wishlist || [],
           concepts: finalConcepts,
           side_quests: sideQuestsArr || [],
           ai_chat_history: chatHistoryArr || [],
