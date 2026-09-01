@@ -320,8 +320,13 @@ function useUserLocalState(user) {
       }
     }
 
-    load();
-    return () => { active = false; };
+    const readyTimer = setTimeout(() => setReady(true), 800);
+
+    load().finally(() => clearTimeout(readyTimer));
+    return () => {
+      active = false;
+      clearTimeout(readyTimer);
+    };
   }, [userId]);
 
   // Persist state to IndexedDB on state changes
@@ -1058,8 +1063,9 @@ function App() {
     let maxStreak = 0;
     let checkDate = new Date();
     
-    // Check backwards day by day
-    while (true) {
+    // Check backwards day by day (capped at 365 days max)
+    let loopGuard = 0;
+    while (loopGuard++ < 365) {
       const dateKey = checkDate.toISOString().slice(0, 10);
       const dayDone = activeTasks.some(t => local.completions[`${t.id}:${dateKey}`]);
       if (dayDone) {
