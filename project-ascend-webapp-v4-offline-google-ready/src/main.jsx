@@ -68,7 +68,7 @@ function getLevelRankTitle(level) {
 
 // --- INDEXEDDB MULTI-USER ISOLATED STORAGE ---
 const DB_NAME = "project_ascend_v4_db";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus", "dues"];
 
 function openDB() {
@@ -91,6 +91,7 @@ function openDB() {
 async function idbGetUserRecords(storeName, userId) {
   try {
     const db = await openDB();
+    if (!db.objectStoreNames.contains(storeName)) return [];
     return new Promise((resolve, reject) => {
       const tx = db.transaction(storeName, "readonly");
       const store = tx.objectStore(storeName);
@@ -107,6 +108,7 @@ async function idbGetUserRecords(storeName, userId) {
 async function idbSaveUserRecords(storeName, records, userId) {
   try {
     const db = await openDB();
+    if (!db.objectStoreNames.contains(storeName)) return;
     const tx = db.transaction(storeName, "readwrite");
     const store = tx.objectStore(storeName);
     const index = store.index("user_id");
@@ -4588,6 +4590,68 @@ function DueModal({ modalData, onClose, onSave }) {
   );
 }
 
+// --- ERROR BOUNDARY RECOVERY ENGINE ---
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("Uncaught runtime error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#0d0f17",
+          color: "#fff",
+          fontFamily: "system-ui, -apple-system, sans-serif",
+          padding: "24px",
+          textAlign: "center"
+        }}>
+          <div style={{ fontSize: "48px", marginBottom: "12px" }}>⚔️</div>
+          <h2 style={{ color: "#f5b942", fontSize: "1.8rem", margin: "0 0 10px 0" }}>PROJECT ASCEND RECOVERY</h2>
+          <p style={{ color: "#94a3b8", maxWidth: "480px", margin: "0 0 24px 0", lineHeight: 1.5 }}>
+            A temporary browser database conflict occurred. Click below to reload your vault and sync cleanly.
+          </p>
+          <button
+            onClick={() => {
+              indexedDB.deleteDatabase("project_ascend_v4_db");
+              window.location.reload();
+            }}
+            style={{
+              background: "linear-gradient(135deg, #f5b942 0%, #e0a020 100%)",
+              color: "#000",
+              border: "none",
+              padding: "14px 28px",
+              borderRadius: "10px",
+              fontWeight: 700,
+              fontSize: "1rem",
+              cursor: "pointer",
+              boxShadow: "0 4px 14px rgba(245, 185, 66, 0.4)"
+            }}
+          >
+            🔄 Reset Local Vault & Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // --- RENDER APPLICATION ---
-createRoot(document.getElementById("root")).render(<App />);
+createRoot(document.getElementById("root")).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);
 
