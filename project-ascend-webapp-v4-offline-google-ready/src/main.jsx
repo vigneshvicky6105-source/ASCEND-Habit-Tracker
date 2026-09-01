@@ -103,12 +103,26 @@ async function idbGetUserRecords(storeName, userId) {
     const db = await openDB();
     if (!db || !db.objectStoreNames || !db.objectStoreNames.contains(storeName)) return [];
     return new Promise((resolve) => {
-      const tx = db.transaction(storeName, "readonly");
-      const store = tx.objectStore(storeName);
-      const index = store.index("user_id");
-      const req = index.getAll(userId);
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => resolve([]);
+      try {
+        const tx = db.transaction(storeName, "readonly");
+        const store = tx.objectStore(storeName);
+        if (store.indexNames && store.indexNames.contains("user_id")) {
+          const index = store.index("user_id");
+          const req = index.getAll(userId);
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => resolve([]);
+        } else {
+          const req = store.getAll();
+          req.onsuccess = () => {
+            const all = req.result || [];
+            resolve(all.filter(r => r && (r.user_id === userId || userId === "guest")));
+          };
+          req.onerror = () => resolve([]);
+        }
+      } catch (e) {
+        console.warn("IDB get error:", e);
+        resolve([]);
+      }
     });
   } catch {
     return [];
@@ -119,21 +133,36 @@ async function idbSaveUserRecords(storeName, records, userId) {
   try {
     const db = await openDB();
     if (!db || !db.objectStoreNames || !db.objectStoreNames.contains(storeName)) return;
-    const tx = db.transaction(storeName, "readwrite");
-    const store = tx.objectStore(storeName);
-    const index = store.index("user_id");
-    const getAllReq = index.getAllKeys(userId);
-    
-    getAllReq.onsuccess = () => {
-      const existingKeys = getAllReq.result || [];
-      existingKeys.forEach(k => store.delete(k));
-      (records || []).forEach(r => {
-        if (r) store.put({ ...r, user_id: userId });
-      });
-    };
     return new Promise((resolve) => {
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => resolve();
+      try {
+        const tx = db.transaction(storeName, "readwrite");
+        const store = tx.objectStore(storeName);
+        if (store.indexNames && store.indexNames.contains("user_id")) {
+          const index = store.index("user_id");
+          const getAllReq = index.getAllKeys(userId);
+          getAllReq.onsuccess = () => {
+            const existingKeys = getAllReq.result || [];
+            existingKeys.forEach(k => store.delete(k));
+            (records || []).forEach(r => {
+              if (r) store.put({ ...r, user_id: userId });
+            });
+          };
+          getAllReq.onerror = () => {
+            (records || []).forEach(r => {
+              if (r) store.put({ ...r, user_id: userId });
+            });
+          };
+        } else {
+          (records || []).forEach(r => {
+            if (r) store.put({ ...r, user_id: userId });
+          });
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      } catch (e) {
+        console.warn("IDB save tx error:", e);
+        resolve();
+      }
     });
   } catch (e) {
     console.error("IDB save error:", e);
@@ -4355,9 +4384,24 @@ class ErrorBoundary extends Component {
             <h2 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "8px", color: "#fff" }}>
               Vault Recovery Shield
             </h2>
-            <p style={{ color: "#a0aec0", fontSize: "0.95rem", marginBottom: "20px", lineHeight: "1.5" }}>
+            <p style={{ color: "#a0aec0", fontSize: "0.95rem", marginBottom: "16px", lineHeight: "1.5" }}>
               A rendering glitch occurred. Click below to refresh cleanly and restore your session.
             </p>
+            {this.state.error && (
+              <pre style={{
+                background: "rgba(0,0,0,0.4)",
+                color: "#f56565",
+                padding: "10px",
+                borderRadius: "8px",
+                fontSize: "0.75rem",
+                textAlign: "left",
+                overflowX: "auto",
+                marginBottom: "20px",
+                maxHeight: "120px"
+              }}>
+                {this.state.error.toString()}
+              </pre>
+            )}
             <button
               onClick={() => {
                 try {
