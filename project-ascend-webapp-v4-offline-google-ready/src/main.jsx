@@ -67,19 +67,34 @@ const DB_VERSION = 5;
 const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus", "dues"];
 
 function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      STORES.forEach(s => {
-        if (!db.objectStoreNames.contains(s)) {
-          const store = db.createObjectStore(s, { keyPath: "id" });
-          store.createIndex("user_id", "user_id", { unique: false });
-        }
-      });
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+  return new Promise((resolve) => {
+    try {
+      const timeoutTimer = setTimeout(() => resolve(null), 1500);
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        STORES.forEach(s => {
+          if (!db.objectStoreNames.contains(s)) {
+            const store = db.createObjectStore(s, { keyPath: "id" });
+            store.createIndex("user_id", "user_id", { unique: false });
+          }
+        });
+      };
+      req.onsuccess = () => {
+        clearTimeout(timeoutTimer);
+        resolve(req.result);
+      };
+      req.onerror = () => {
+        clearTimeout(timeoutTimer);
+        resolve(null);
+      };
+      req.onblocked = () => {
+        clearTimeout(timeoutTimer);
+        resolve(null);
+      };
+    } catch {
+      resolve(null);
+    }
   });
 }
 
