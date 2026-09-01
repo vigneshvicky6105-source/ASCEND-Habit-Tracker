@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, Component } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -566,9 +566,9 @@ function App() {
 
   // --- QUEST ACTIONS ---
   const activeTasks = useMemo(() => {
-    return local.tasks
-      .filter(t => t.active !== false)
-      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    return (local.tasks || [])
+      .filter(t => t && typeof t === "object" && t.active !== false)
+      .sort((a, b) => ((a && a.sort_order) || 0) - ((b && b.sort_order) || 0));
   }, [local.tasks]);
 
   const toggleTaskCompletion = (task) => {
@@ -1023,30 +1023,34 @@ function App() {
 
   // --- CALCULATED STATS & ANALYTICS ---
   const todayCompletionsCount = useMemo(() => {
-    return activeTasks.filter(t => local.completions[`${t.id}:${todayStr()}`]).length;
+    const completions = local.completions || {};
+    return activeTasks.filter(t => t && t.id && completions[`${t.id}:${todayStr()}`]).length;
   }, [activeTasks, local.completions]);
 
   const completionPct = activeTasks.length ? Math.round((todayCompletionsCount / activeTasks.length) * 100) : 0;
   
   const todayXp = useMemo(() => {
+    const completions = local.completions || {};
     return activeTasks
-      .filter(t => local.completions[`${t.id}:${todayStr()}`])
-      .reduce((acc, t) => acc + (t.xp || 10), 0);
+      .filter(t => t && t.id && completions[`${t.id}:${todayStr()}`])
+      .reduce((acc, t) => acc + ((t && t.xp) || 10), 0);
   }, [activeTasks, local.completions]);
 
   // Level logic: level = floor(Total Cumulative XP / 100) + 1
   const totalXpAllTime = useMemo(() => {
     let total = 0;
-    Object.keys(local.completions).forEach(k => {
-      if (local.completions[k]) {
+    const completions = local.completions || {};
+    const tasks = local.tasks || [];
+    Object.keys(completions).forEach(k => {
+      if (completions[k] && typeof k === "string") {
         const [taskId] = k.split(":");
-        const task = local.tasks.find(t => t.id === taskId);
+        const task = tasks.find(t => t && t.id === taskId);
         total += task ? (task.xp || 10) : 10;
       }
     });
     // Side Quests XP (+10 Low, +20 Medium, +30 High)
     (local.side_quests || []).forEach(sq => {
-      if (sq.completed) {
+      if (sq && sq.completed) {
         const xp = sq.priority === "High" ? 30 : sq.priority === "Medium" ? 20 : 10;
         total += xp;
       }
@@ -1062,12 +1066,13 @@ function App() {
     let currentStreak = 0;
     let maxStreak = 0;
     let checkDate = new Date();
+    const completions = local.completions || {};
     
     // Check backwards day by day (capped at 365 days max)
     let loopGuard = 0;
     while (loopGuard++ < 365) {
       const dateKey = checkDate.toISOString().slice(0, 10);
-      const dayDone = activeTasks.some(t => local.completions[`${t.id}:${dateKey}`]);
+      const dayDone = activeTasks.some(t => t && t.id && completions[`${t.id}:${dateKey}`]);
       if (dayDone) {
         currentStreak++;
         checkDate.setDate(checkDate.getDate() - 1);
@@ -1076,7 +1081,7 @@ function App() {
         if (dateKey === todayStr() && currentStreak === 0) {
           checkDate.setDate(checkDate.getDate() - 1);
           const yesterdayKey = checkDate.toISOString().slice(0, 10);
-          if (activeTasks.some(t => local.completions[`${t.id}:${yesterdayKey}`])) {
+          if (activeTasks.some(t => t && t.id && completions[`${t.id}:${yesterdayKey}`])) {
             // Continuation from yesterday
             continue;
           }
@@ -1091,7 +1096,7 @@ function App() {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const key = d.toISOString().slice(0, 10);
-      const dayDone = activeTasks.some(t => local.completions[`${t.id}:${key}`]);
+      const dayDone = activeTasks.some(t => t && t.id && completions[`${t.id}:${key}`]);
       if (dayDone) {
         tempStreak++;
         if (tempStreak > maxStreak) maxStreak = tempStreak;
@@ -4308,5 +4313,84 @@ function DueModal({ modalData, onClose, onSave }) {
   );
 }
 
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("Ascend Runtime Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: "100vh",
+          backgroundColor: "#0b0d14",
+          color: "#e2e8f0",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
+          textAlign: "center",
+          fontFamily: "system-ui, -apple-system, sans-serif"
+        }}>
+          <div style={{
+            background: "rgba(255, 255, 255, 0.05)",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            borderRadius: "16px",
+            padding: "32px",
+            maxWidth: "480px",
+            width: "100%",
+            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.5)"
+          }}>
+            <div style={{ fontSize: "3rem", marginBottom: "16px" }}>⚡</div>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "8px", color: "#fff" }}>
+              Vault Recovery Shield
+            </h2>
+            <p style={{ color: "#a0aec0", fontSize: "0.95rem", marginBottom: "20px", lineHeight: "1.5" }}>
+              A rendering glitch occurred. Click below to refresh cleanly and restore your session.
+            </p>
+            <button
+              onClick={() => {
+                try {
+                  localStorage.clear();
+                  sessionStorage.clear();
+                } catch (e) {}
+                window.location.reload();
+              }}
+              style={{
+                backgroundColor: "#4f46e5",
+                color: "#fff",
+                border: "none",
+                padding: "12px 24px",
+                borderRadius: "8px",
+                fontWeight: "600",
+                fontSize: "1rem",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Reset & Reload Vault 🔄
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // --- RENDER APPLICATION ---
-createRoot(document.getElementById("root")).render(<App />);
+createRoot(document.getElementById("root")).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);
