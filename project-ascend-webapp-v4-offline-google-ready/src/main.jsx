@@ -474,6 +474,15 @@ function App() {
     setUser(null);
   }
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if ((params.get("reset") === "1" || params.get("clear") === "1") && user) {
+      if (confirm("⚠️ Clear and Reset all database tracking data for your account?")) {
+        clearAllUserData();
+      }
+    }
+  }, [user]);
+
   // --- QUEST ACTIONS (100% ONLINE CLOUD MUTATIONS) ---
   const activeTasks = useMemo(() => {
     const raw = (local.tasks || []).filter(t => t && typeof t === "object" && t.active !== false);
