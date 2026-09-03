@@ -6,7 +6,8 @@ const STATIC_ASSETS = [
   "/favicon-32.png",
   "/favicon-16.png",
   "/icon-192.png",
-  "/icon-512.png"
+  "/icon-512.png",
+  "/logo.png"
 ];
 
 self.addEventListener("install", (event) => {
