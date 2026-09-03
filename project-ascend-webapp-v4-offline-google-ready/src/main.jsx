@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   Check, Flame, Plus, Settings, BookOpen, LogIn, LogOut, WifiOff, Cloud,
   Pencil, Trash2, ArrowUp, ArrowDown, Lock, Unlock, Calendar, Trophy,
-  BarChart2, Sparkles, X, ChevronRight, RefreshCw, ShoppingCart, Target,
+  BarChart2, Sparkles, X, ChevronRight, RefreshCw, ShoppingCart, Target, Wallet,
   Layers, CheckCircle2, Circle, Swords, Shield, Clock, CalendarDays, Bell, BellOff
 } from "lucide-react";
 import {
@@ -70,8 +70,8 @@ function getLevelRankTitle(level) {
 
 // --- INDEXEDDB MULTI-USER ISOLATED STORAGE ---
 const DB_NAME = "project_ascend_v4_db";
-const DB_VERSION = 4;
-const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus"];
+const DB_VERSION = 5;
+const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus", "dues"];
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -340,6 +340,8 @@ function App() {
   const [wishlistModal, setWishlistModal] = useState(null); // null | { isNew: bool, item: obj }
   const [conceptModal, setConceptModal] = useState(null); // null | { isNew: bool, concept: obj }
   const [sideQuestModal, setSideQuestModal] = useState(null); // null | { isNew: bool, quest?: obj, defaultDate?: string }
+  const [dueModal, setDueModal] = useState(null); // null | { isNew: bool, due?: obj, defaultType?: string }
+  const [duesSubTab, setDuesSubTab] = useState("lent"); // "lent" | "owed"
   const [questSubTab, setQuestSubTab] = useState("main"); // "main" | "side"
   const [notifPermission, setNotifPermission] = useState(() => {
     try {
@@ -519,6 +521,56 @@ function App() {
   }
 
   // --- QUEST ACTIONS ---
+  
+  const saveDue = (dueData) => {
+    setLocal(s => {
+      const list = [...(s.dues || [])];
+      const orig = parseFloat(dueData.original_amount) || 0;
+      const paid = parseFloat(dueData.amount_paid) || 0;
+      const status = paid >= orig ? "Paid" : paid > 0 ? "Partially Paid" : "Pending";
+      if (dueData.isNew) {
+        list.push({
+          id: dueData.id || crypto.randomUUID(),
+          user_id: userId,
+          person_name: dueData.person_name,
+          type: dueData.type,
+          original_amount: orig,
+          amount_paid: paid,
+          date: dueData.date,
+          due_date: dueData.due_date,
+          reason: dueData.reason,
+          status
+        });
+      } else {
+        const idx = list.findIndex(d => d.id === dueData.id);
+        if (idx !== -1) {
+          list[idx] = {
+            ...list[idx],
+            person_name: dueData.person_name,
+            type: dueData.type,
+            original_amount: orig,
+            amount_paid: paid,
+            date: dueData.date,
+            due_date: dueData.due_date,
+            reason: dueData.reason,
+            status
+          };
+        }
+      }
+      return { ...s, dues: list };
+    });
+    setDueModal(null);
+  };
+
+  const deleteDue = (dueId) => {
+    if (confirm("Delete this due entry?")) {
+      setLocal(s => ({
+        ...s,
+        dues: (s.dues || []).filter(d => d.id !== dueId)
+      }));
+    }
+  };
+
   const activeTasks = useMemo(() => {
     return local.tasks
       .filter(t => t.active !== false)
@@ -969,6 +1021,7 @@ function App() {
           { id: "quests", label: "Quests Center ⚔️", icon: <Swords size={16} /> },
           { id: "reading", label: "Reading Center", icon: <BookOpen size={16} /> },
           { id: "wishlist", label: "Wishlist", icon: <ShoppingCart size={16} /> },
+          { id: "dues", label: "Dues Tracker 💸", icon: <Wallet size={16} /> },
           { id: "analytics", label: "Analytics & Insights", icon: <BarChart2 size={16} /> },
           { id: "ai", label: "Ascend AI 🤖", icon: <Sparkles size={16} /> },
           { id: "achievements", label: "Achievements 🏆", icon: <Trophy size={16} /> },
@@ -1077,6 +1130,18 @@ function App() {
         />
       )}
 
+      
+      {tab === "dues" && (
+        <DuesView
+          dues={local.dues || []}
+          subTab={duesSubTab}
+          setSubTab={setDuesSubTab}
+          setLocal={setLocal}
+          onOpenDueModal={setDueModal}
+          onDeleteDue={deleteDue}
+        />
+      )}
+
       {tab === "analytics" && (
         <AnalyticsView
           local={local}
@@ -1115,6 +1180,15 @@ function App() {
           modalData={sideQuestModal}
           onClose={() => setSideQuestModal(null)}
           onSave={saveSideQuestModal}
+        />
+      )}
+
+      
+      {dueModal && (
+        <DueModal
+          modalData={dueModal}
+          onClose={() => setDueModal(null)}
+          onSave={saveDue}
         />
       )}
 
@@ -3709,3 +3783,444 @@ function WishlistModal({ modalData, onClose, onSave }) {
 
 // --- RENDER APPLICATION ---
 createRoot(document.getElementById("root")).render(<App />);
+
+
+function DuesView({ dues, subTab, setSubTab, setLocal, onOpenDueModal, onDeleteDue }) {
+  const today = todayStr();
+
+  // Filter dues by type (lent or owed)
+  const lentItems = useMemo(() => dues.filter(d => (d.type || "lent") === "lent"), [dues]);
+  const owedItems = useMemo(() => dues.filter(d => (d.type || "lent") === "owed"), [dues]);
+
+  // Calculations: Total Lent (outstanding), Total Owed (outstanding), Net Dues
+  const totalLent = useMemo(() => {
+    return lentItems
+      .filter(d => d.status !== "Paid")
+      .reduce((acc, d) => acc + Math.max(0, (Number(d.original_amount) || 0) - (Number(d.amount_paid) || 0)), 0);
+  }, [lentItems]);
+
+  const totalOwed = useMemo(() => {
+    return owedItems
+      .filter(d => d.status !== "Paid")
+      .reduce((acc, d) => acc + Math.max(0, (Number(d.original_amount) || 0) - (Number(d.amount_paid) || 0)), 0);
+  }, [owedItems]);
+
+  const netDues = totalLent - totalOwed;
+
+  // Overdue calculation
+  const overdueCount = useMemo(() => {
+    return dues.filter(d => {
+      if (d.status === "Paid" || !d.due_date) return false;
+      return d.due_date < today;
+    }).length;
+  }, [dues, today]);
+
+  const lentPendingCount = useMemo(() => lentItems.filter(d => d.status !== "Paid").length, [lentItems]);
+  const owedPendingCount = useMemo(() => owedItems.filter(d => d.status !== "Paid").length, [owedItems]);
+
+  const activeItems = subTab === "lent" ? lentItems : owedItems;
+
+  const markAsPaid = (due) => {
+    const orig = Number(due.original_amount) || 0;
+    setLocal(s => ({
+      ...s,
+      dues: (s.dues || []).map(d =>
+        d.id === due.id
+          ? { ...d, amount_paid: orig, status: "Paid", updated_at: new Date().toISOString() }
+          : d
+      )
+    }));
+  };
+
+  const handleQuickPayment = (due) => {
+    const orig = Number(due.original_amount) || 0;
+    const currentPaid = Number(due.amount_paid) || 0;
+    const remaining = Math.max(0, orig - currentPaid);
+
+    const input = prompt(`Record payment for ${due.person_name} (Remaining: ₹${remaining}):`, remaining);
+    if (input === null) return;
+    const addAmt = parseFloat(input);
+    if (isNaN(addAmt) || addAmt <= 0) return;
+
+    const newPaid = Math.min(orig, currentPaid + addAmt);
+    let newStatus = "Pending";
+    if (newPaid >= orig && orig > 0) newStatus = "Paid";
+    else if (newPaid > 0) newStatus = "Partially Paid";
+
+    setLocal(s => ({
+      ...s,
+      dues: (s.dues || []).map(d =>
+        d.id === due.id
+          ? { ...d, amount_paid: newPaid, status: newStatus, updated_at: new Date().toISOString() }
+          : d
+      )
+    }));
+  };
+
+  return (
+    <main className="viewContainer fade-in">
+      {/* PAGE HEADER */}
+      <div className="pageHeaderRow">
+        <div>
+          <div className="eyebrowText">
+            <Wallet size={13} /> FINANCIAL DUES OPERATING CENTER
+          </div>
+          <h2 className="pageTitle">DUES TRACKER 💸</h2>
+          <p className="pageSubtitle">
+            Track money lent to others and money owed to recipients with automatic remaining balance calculation, payment status, and overdue reminders.
+          </p>
+        </div>
+
+        <div className="headerBtnGroup">
+          <button className="primaryBtn" onClick={() => onOpenDueModal({ isNew: true, defaultType: subTab })}>
+            <Plus size={16} />
+            <span>{subTab === "lent" ? "+ Add Lent Record" : "+ Add Owed Record"}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* SUMMARY METRICS CARDS */}
+      <div className="metricsGrid duesMetricsGrid">
+        <div className="metricCard">
+          <div className="metricIcon gold"><ArrowUpRight size={22} /></div>
+          <div className="metricData">
+            <strong>₹{totalLent.toLocaleString("en-IN")}</strong>
+            <small>Total Outstanding Lent</small>
+          </div>
+        </div>
+
+        <div className="metricCard">
+          <div className="metricIcon flame"><ArrowDownLeft size={22} /></div>
+          <div className="metricData">
+            <strong>₹{totalOwed.toLocaleString("en-IN")}</strong>
+            <small>Total Outstanding Owed</small>
+          </div>
+        </div>
+
+        <div className="metricCard">
+          <div className={`metricIcon ${netDues >= 0 ? 'star' : 'flame'}`}>
+            <Wallet size={22} />
+          </div>
+          <div className="metricData">
+            <strong style={{ color: netDues >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
+              {netDues >= 0 ? `+₹${netDues.toLocaleString("en-IN")}` : `-₹${Math.abs(netDues).toLocaleString("en-IN")}`}
+            </strong>
+            <small>Net Dues (Lent - Owed)</small>
+          </div>
+        </div>
+
+        <div className="metricCard">
+          <div className="metricIcon book"><Clock size={22} /></div>
+          <div className="metricData">
+            <strong>{overdueCount}</strong>
+            <small>Overdue Entries</small>
+          </div>
+        </div>
+      </div>
+
+      {/* SUB-TABS NAVIGATION (Lent | Owed) */}
+      <div className="subNavTabsProminent" style={{ marginBottom: "20px" }}>
+        <button
+          className={`subNavBtnProminent ${subTab === "lent" ? "active" : ""}`}
+          onClick={() => setSubTab("lent")}
+        >
+          <ArrowUpRight size={16} />
+          <span>Lent (Money Owed to Me)</span>
+          {lentPendingCount > 0 && <span className="subBadgeCount">{lentPendingCount}</span>}
+        </button>
+        <button
+          className={`subNavBtnProminent ${subTab === "owed" ? "active" : ""}`}
+          onClick={() => setSubTab("owed")}
+        >
+          <ArrowDownLeft size={16} />
+          <span>Owed (Money I Owe)</span>
+          {owedPendingCount > 0 && <span className="subBadgeCount">{owedPendingCount}</span>}
+        </button>
+      </div>
+
+      {/* DUES CARDS GRID */}
+      <div className="duesGrid">
+        {activeItems.length === 0 ? (
+          <div className="glassPanel emptyState" style={{ gridColumn: "1 / -1", padding: "40px 20px", textAlign: "center" }}>
+            <h3>{subTab === "lent" ? "No money lent yet." : "Nothing owed yet."}</h3>
+            <p style={{ color: "var(--text-muted)", margin: "8px 0 16px" }}>
+              {subTab === "lent"
+                ? "Keep track of money you give to friends or colleagues."
+                : "Keep track of money you borrow or owe to recipients."}
+            </p>
+            <button className="primaryBtn" onClick={() => onOpenDueModal({ isNew: true, defaultType: subTab })}>
+              <Plus size={16} />
+              <span>{subTab === "lent" ? "+ Add Lent Record" : "+ Add Owed Record"}</span>
+            </button>
+          </div>
+        ) : (
+          activeItems.map((due) => {
+            const orig = Number(due.original_amount) || 0;
+            const paid = Number(due.amount_paid) || 0;
+            const remaining = Math.max(0, orig - paid);
+            const pct = orig > 0 ? Math.min(100, Math.round((paid / orig) * 100)) : 0;
+
+            let isOverdue = false;
+            let overdueDays = 0;
+            if (due.status !== "Paid" && due.due_date) {
+              const dTime = new Date(due.due_date).getTime();
+              const tTime = new Date(today).getTime();
+              if (dTime < tTime) {
+                isOverdue = true;
+                overdueDays = Math.max(1, Math.floor((tTime - dTime) / (1000 * 60 * 60 * 24)));
+              }
+            }
+
+            const statusClass = (due.status || "Pending").toLowerCase().replace(/\s+/g, "");
+
+            return (
+              <div key={due.id} className={`dueCard ${isOverdue ? "isOverdue" : ""}`}>
+                <div className="dueHeader">
+                  <div>
+                    <h3 className="duePersonName">{due.person_name}</h3>
+                    <div className="dueBadgesRow">
+                      <span className={`dueTypeTag ${due.type}`}>
+                        {due.type === "lent" ? "Lent" : "Owed"}
+                      </span>
+                      <span className={`statusPill ${statusClass}`}>
+                        {due.status || "Pending"}
+                      </span>
+                      {isOverdue && (
+                        <span className="overdueBadge">
+                          <Bell size={12} /> Overdue · {overdueDays} day{overdueDays > 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="cardActions">
+                    <button className="iconBtn small" onClick={() => onOpenDueModal({ isNew: false, due })}>
+                      <Pencil size={14} />
+                    </button>
+                    <button className="iconBtn small dangerHover" onClick={() => onDeleteDue(due.id)}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* FINANCIAL AMOUNTS BLOCK */}
+                <div className="dueAmountBlock">
+                  <div className="amountCol">
+                    <small>Original</small>
+                    <strong>₹{orig.toLocaleString("en-IN")}</strong>
+                  </div>
+                  <div className="amountCol">
+                    <small>Paid</small>
+                    <strong style={{ color: "var(--color-success)" }}>₹{paid.toLocaleString("en-IN")}</strong>
+                  </div>
+                  <div className="amountCol remaining">
+                    <small>Remaining</small>
+                    <strong>₹{remaining.toLocaleString("en-IN")}</strong>
+                  </div>
+                </div>
+
+                {/* PAYMENT PROGRESS BAR */}
+                <div className="bookProgressBlock">
+                  <div className="progressLabels">
+                    <span>Payment Progress ({pct}%)</span>
+                    <span>₹{paid.toLocaleString("en-IN")} / ₹{orig.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="progressBarTrack">
+                    <div className="progressBarFill" style={{ width: `${pct}%`, background: pct === 100 ? "var(--color-success)" : "var(--accent-gold)" }}></div>
+                  </div>
+                </div>
+
+                {/* DATES & REASON */}
+                <div className="dueDatesRow">
+                  <span>Given/Borrowed: {due.date || "N/A"}</span>
+                  {due.due_date && <span>Due Date: {due.due_date}</span>}
+                </div>
+
+                {due.reason && (
+                  <div className="dueReasonBlock">
+                    <strong>Note:</strong> {due.reason}
+                  </div>
+                )}
+
+                {/* FOOTER ACTIONS */}
+                <div className="dueFooterActions">
+                  <div className="dueActionBtns">
+                    {due.status !== "Paid" && (
+                      <>
+                        <button className="markPaidBtn" onClick={() => markAsPaid(due)}>
+                          <CheckCircle2 size={14} /> Mark Paid
+                        </button>
+                        <button className="logPayBtn" onClick={() => handleQuickPayment(due)}>
+                          <Plus size={14} /> Log Payment
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {due.status === "Paid" && (
+                    <span style={{ fontSize: "12px", color: "var(--color-success)", fontWeight: 700 }}>
+                      ✓ Fully Settled
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </main>
+  );
+}
+
+// ==========================================
+// DUES MODAL (ADD / EDIT LENT & OWED)
+// ==========================================
+function DueModal({ modalData, onClose, onSave }) {
+  const due = modalData.due || {};
+  const [personName, setPersonName] = useState(due.person_name || "");
+  const [type, setType] = useState(due.type || modalData.defaultType || "lent");
+  const [originalAmount, setOriginalAmount] = useState(due.original_amount !== undefined ? due.original_amount : "");
+  const [amountPaid, setAmountPaid] = useState(due.amount_paid !== undefined ? due.amount_paid : "0");
+  const [date, setDate] = useState(due.date || todayStr());
+  const [dueDate, setDueDate] = useState(due.due_date || "");
+  const [reason, setReason] = useState(due.reason || "");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setErrorMsg("");
+
+    if (!personName.trim()) {
+      setErrorMsg("Person or Recipient Name is required.");
+      return;
+    }
+
+    const orig = parseFloat(originalAmount);
+    if (isNaN(orig) || orig <= 0) {
+      setErrorMsg("Original amount must be greater than 0.");
+      return;
+    }
+
+    const paid = parseFloat(amountPaid) || 0;
+    if (paid < 0) {
+      setErrorMsg("Amount paid cannot be negative.");
+      return;
+    }
+
+    if (paid > orig) {
+      setErrorMsg("Amount paid cannot exceed original amount.");
+      return;
+    }
+
+    onSave({
+      isNew: modalData.isNew,
+      id: due.id,
+      person_name: personName.trim(),
+      type,
+      original_amount: orig,
+      amount_paid: paid,
+      date,
+      due_date: dueDate || null,
+      reason: reason.trim()
+    });
+  };
+
+  return (
+    <div className="modalBackdrop">
+      <div className="modalCard glassPanel">
+        <div className="modalHeader">
+          <h3>{modalData.isNew ? `Add New ${type === "lent" ? "Lent" : "Owed"} Entry` : "Edit Due Entry"}</h3>
+          <button className="iconBtn small" onClick={onClose}><X size={16} /></button>
+        </div>
+
+        {errorMsg && (
+          <div style={{ background: "rgba(239, 68, 68, 0.2)", border: "1px solid var(--color-danger)", color: "#fca5a5", padding: "10px 14px", borderRadius: "8px", fontSize: "13px", marginBottom: "14px" }}>
+            ⚠️ {errorMsg}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="modalForm">
+          <div className="formGroup">
+            <label>Person / Recipient Name *</label>
+            <input
+              type="text"
+              required
+              value={personName}
+              onChange={e => setPersonName(e.target.value)}
+              placeholder="e.g. Rahul Sharma"
+            />
+          </div>
+
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Due Type</label>
+              <select value={type} onChange={e => setType(e.target.value)} className="selectInput">
+                <option value="lent">Lent (Money Given to Others)</option>
+                <option value="owed">Owed (Money I Owe)</option>
+              </select>
+            </div>
+            <div className="formGroup">
+              <label>Total Amount (₹) *</label>
+              <input
+                type="number"
+                step="any"
+                required
+                value={originalAmount}
+                onChange={e => setOriginalAmount(e.target.value)}
+                placeholder="e.g. 5000"
+              />
+            </div>
+          </div>
+
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Amount Already Paid (₹)</label>
+              <input
+                type="number"
+                step="any"
+                value={amountPaid}
+                onChange={e => setAmountPaid(e.target.value)}
+                placeholder="e.g. 2000"
+              />
+            </div>
+            <div className="formGroup">
+              <label>Date Given / Borrowed</label>
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="formGroup">
+            <label>Due Date (Optional)</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={e => setDueDate(e.target.value)}
+            />
+          </div>
+
+          <div className="formGroup">
+            <label>Reason / Note</label>
+            <textarea
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="e.g. Dinner split, trip expense, loan..."
+              rows={3}
+            />
+          </div>
+
+          <div className="modalFooter">
+            <button type="button" className="secondaryBtn" onClick={onClose}>Cancel</button>
+            <button type="submit" className="primaryBtn">Save Entry</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// --- RENDER APPLICATION ---
+createRoot(document.getElementById("root")).render(<App />);
+
