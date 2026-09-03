@@ -1598,6 +1598,9 @@ function App() {
           {user ? (
             <div className="userBadge">
               <span className="userEmail">{user.email}</span>
+              <button className="iconBtn dangerHover" onClick={clearAllUserData} title="Reset Vault & Clear All Data Freshly 🧹">
+                <Trash2 size={16} color="#ef4444" />
+              </button>
               <button className="iconBtn dangerHover" onClick={handleLogout} title="Sign Out">
                 <LogOut size={16} />
               </button>
