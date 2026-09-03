@@ -21,18 +21,15 @@ const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUP
 
 // --- DEFAULT STARTER DATA ---
 const STARTER_QUESTS = [
-  { title: "LeetCode + GeeksforGeeks", category: "Coding", target: "1 problem", xp: 10, locked: true },
-  { title: "Check Mail", category: "Career/Admin", target: "1 check", xp: 5, locked: true },
-  { title: "IT Learning", category: "Learning", target: "1 lesson", xp: 10, locked: false },
-  { title: "Apply for Jobs — Naukri + Indeed", category: "Career", target: "1+ application", xp: 15, locked: true },
-  { title: "Read 10 Pages", category: "Reading", target: "10 pages", xp: 10, locked: true },
-  { title: "Post on LinkedIn", category: "Career/Brand", target: "1 post", xp: 8, locked: false },
-  { title: "Create + Post Brainrot Videos", category: "Content", target: "1 video", xp: 10, locked: false },
-  { title: "Core Concept Learning", category: "Learning", target: "1 concept", xp: 10, locked: true },
-  { title: "Python Brush-Up", category: "Coding", target: "30 min", xp: 10, locked: true },
-  { title: "Drink 5L Water", category: "Health", target: "5 L", xp: 5, locked: true },
-  { title: "Record Yourself Explaining a Topic", category: "Communication", target: "1 video", xp: 10, locked: false },
-  { title: "Run 5 KM", category: "Fitness", target: "5 KM", xp: 7, locked: false }
+  { quest_key: "main_quest_01", title: "LeetCode + GeeksforGeeks", category: "Coding", target: "1 problem", xp: 10, locked: true },
+  { quest_key: "main_quest_02", title: "Check Mail", category: "Career/Admin", target: "1 check", xp: 5, locked: true },
+  { quest_key: "main_quest_03", title: "IT Learning", category: "Learning", target: "1 lesson", xp: 10, locked: false },
+  { quest_key: "main_quest_04", title: "Apply for Jobs — Naukri + Indeed", category: "Career", target: "1+ application", xp: 15, locked: true },
+  { quest_key: "main_quest_05", title: "Read 10 Pages", category: "Reading", target: "10 pages", xp: 10, locked: true },
+  { quest_key: "main_quest_06", title: "Post on LinkedIn", category: "Career/Brand", target: "1 post", xp: 8, locked: false },
+  { quest_key: "main_quest_07", title: "Create + Post Brainrot Videos", category: "Content", target: "1 video", xp: 10, locked: false },
+  { quest_key: "main_quest_08", title: "Core Concept Learning", category: "Learning", target: "1 concept", xp: 10, locked: true },
+  { quest_key: "main_quest_09", title: "Python Brush-Up", category: "Coding", target: "30 min", xp: 10, locked: true }
 ];
 
 const STARTER_CONCEPTS = [
@@ -140,10 +137,11 @@ function setLocalBackup(userId, entity, data) {
   } catch (e) {}
 }
 
-function getStarterTaskId(userId, idx) {
-  if (!userId) return `00000000-0000-4000-8000-${String(idx).padStart(12, "0")}`;
-  const clean = userId.replace(/[^0-9a-f]/gi, "").padEnd(32, "0");
-  return `${clean.slice(0, 8)}-${clean.slice(8, 12)}-4${clean.slice(13, 16)}-a${clean.slice(17, 20)}-${clean.slice(20, 31)}${idx % 10}`;
+function getBaselineQuestUuid(userId, questKey) {
+  if (!userId) return `00000000-0000-4000-8000-${String(questKey).replace(/[^0-9]/g, "").padStart(12, "0")}`;
+  const cleanUid = userId.replace(/[^0-9a-f]/gi, "").padEnd(32, "0");
+  const numKey = String(questKey || "0").replace(/[^0-9]/g, "").padStart(4, "0");
+  return `${cleanUid.slice(0, 8)}-${cleanUid.slice(8, 12)}-4000-a${numKey.slice(0, 3)}-${cleanUid.slice(16, 27)}${numKey.slice(3)}`;
 }
 
 function isTaskCompleted(task, dateKey, completions) {
@@ -250,10 +248,11 @@ function useUserOnlineState(user) {
 
       let finalTasks = tasks || [];
       if (finalTasks.length === 0 && userId && !missing.includes("tasks")) {
-        // Seed initial starter tasks with deterministic UUIDs to Supabase Cloud Database
+        // Seed initial 9 baseline starter tasks with deterministic UUIDs & quest_key to Supabase Cloud Database
         const seedTasks = STARTER_QUESTS.map((q, idx) => ({
-          id: getStarterTaskId(userId, idx),
+          id: getBaselineQuestUuid(userId, q.quest_key),
           user_id: userId,
+          quest_key: q.quest_key,
           title: q.title,
           category: q.category,
           target: q.target,
@@ -265,29 +264,30 @@ function useUserOnlineState(user) {
           updated_at: new Date().toISOString()
         }));
         const { error: seedErr } = await supabase.from("tasks").upsert(seedTasks, { onConflict: "id" });
-        if (seedErr) console.error("Starter tasks DB seeding error:", seedErr);
+        if (seedErr) console.error("[ASCEND SYNC] Starter tasks DB seeding error:", seedErr);
         else finalTasks = seedTasks;
       }
 
-      // Deduplicate tasks by normalized title to eliminate any historical duplicate entries
-      const seenTaskTitles = new Set();
+      // Deduplicate tasks strictly by quest_key or normalized title to eliminate any historical duplicate entries
+      const seenTaskKeys = new Set();
       const dedupedTasks = [];
       const duplicateTaskIds = [];
 
       (finalTasks || []).forEach(t => {
-        if (!t || !t.title) return;
-        const normTitle = t.title.trim().toLowerCase();
-        if (seenTaskTitles.has(normTitle)) {
+        if (!t) return;
+        const key = t.quest_key || (t.title ? t.title.trim().toLowerCase() : t.id);
+        if (seenTaskKeys.has(key)) {
           if (t.id) duplicateTaskIds.push(t.id);
         } else {
-          seenTaskTitles.add(normTitle);
+          seenTaskKeys.add(key);
           dedupedTasks.push(t);
         }
       });
 
       if (duplicateTaskIds.length > 0 && userId && supabase) {
+        console.log(`[ASCEND SYNC] Purging ${duplicateTaskIds.length} duplicate task IDs from cloud database...`);
         const { error: purgeErr } = await supabase.from("tasks").delete().in("id", duplicateTaskIds);
-        if (purgeErr) console.error("Error purging duplicate tasks in DB:", purgeErr);
+        if (purgeErr) console.error("[ASCEND SYNC] Error purging duplicate tasks in DB:", purgeErr);
       }
 
       finalTasks = dedupedTasks;
@@ -295,7 +295,7 @@ function useUserOnlineState(user) {
       let finalConcepts = concepts || [];
       if (finalConcepts.length === 0 && userId && !missing.includes("core_concepts")) {
         const seedConcepts = STARTER_CONCEPTS.map((c, idx) => ({
-          id: getStarterTaskId(userId, idx + 10),
+          id: getBaselineQuestUuid(userId, `concept_${idx}`),
           user_id: userId,
           title: c.title,
           subtitle: c.subtitle,
@@ -303,18 +303,18 @@ function useUserOnlineState(user) {
           created_at: new Date().toISOString()
         }));
         const { error: cSeedErr } = await supabase.from("core_concepts").upsert(seedConcepts, { onConflict: "id" });
-        if (cSeedErr) console.error("Starter concepts DB seeding error:", cSeedErr);
+        if (cSeedErr) console.error("[ASCEND SYNC] Starter concepts DB seeding error:", cSeedErr);
         else finalConcepts = seedConcepts;
       }
 
       const debtsList = (dues || []).filter(d => (d.type || "owed") === "owed" || d.type === "debt");
 
       setState({
-        tasks: finalTasks.length > 0 ? finalTasks : STARTER_QUESTS.map((q, idx) => ({ id: getStarterTaskId(userId, idx), title: q.title, category: q.category, target: q.target, xp: q.xp, locked: q.locked, active: true, sort_order: idx })),
+        tasks: finalTasks.length > 0 ? finalTasks : STARTER_QUESTS.map((q, idx) => ({ id: getBaselineQuestUuid(userId, q.quest_key), quest_key: q.quest_key, title: q.title, category: q.category, target: q.target, xp: q.xp, locked: q.locked, active: true, sort_order: idx })),
         completions: compMap,
         books: books || [],
         wishlist: wishlist || [],
-        concepts: finalConcepts.length > 0 ? finalConcepts : STARTER_CONCEPTS.map((c, idx) => ({ id: getStarterTaskId(userId, idx + 10), title: c.title, subtitle: c.subtitle, sort_order: idx })),
+        concepts: finalConcepts.length > 0 ? finalConcepts : STARTER_CONCEPTS.map((c, idx) => ({ id: getBaselineQuestUuid(userId, `concept_${idx}`), title: c.title, subtitle: c.subtitle, sort_order: idx })),
         side_quests: sideQuests || [],
         ai_chat_history: [],
         challenges: STARTER_CHALLENGES,
@@ -663,12 +663,16 @@ function App() {
       alert("This quest is locked 🔒. Unlock it on the EDIT QUESTS page before deleting.");
       return;
     }
+    const qKey = task.quest_key || null;
     const normTitle = task.title ? task.title.trim().toLowerCase() : "";
-    const duplicateIds = (local.tasks || [])
-      .filter(t => t && t.title && t.title.trim().toLowerCase() === normTitle)
-      .map(t => t.id);
 
     if (confirm(`Are you sure you want to delete "${task.title}" from your Cloud account?`)) {
+      console.log(`[ASCEND SYNC] Deleting task id=${taskId}, quest_key=${qKey}, title="${normTitle}" for user=${user.id}`);
+
+      const duplicateIds = (local.tasks || [])
+        .filter(t => t && ((qKey && t.quest_key === qKey) || (t.title && t.title.trim().toLowerCase() === normTitle)))
+        .map(t => t.id);
+
       const idsToDelete = duplicateIds.length > 0 ? duplicateIds : [taskId];
       const { error } = await supabase
         .from("tasks")
@@ -676,8 +680,13 @@ function App() {
         .in("id", idsToDelete)
         .eq("user_id", user.id);
 
-      if (error) console.error("Cloud quest delete error:", error);
-      fetchOnlineData();
+      if (error) {
+        console.error("[ASCEND SYNC] Cloud quest delete error:", error);
+        alert("Failed to delete task from cloud database: " + error.message);
+      } else {
+        console.log("[ASCEND SYNC] Task deleted successfully from cloud database.");
+        fetchOnlineData();
+      }
     }
   };
 
@@ -748,10 +757,11 @@ function App() {
           await supabase.from(table).delete().eq("user_id", user.id);
         }
 
-        // Re-seed initial clean starter quests for the user
+        // Re-seed initial clean 9 baseline starter quests for the user with deterministic UUIDs & quest_key
         const seedTasks = STARTER_QUESTS.map((q, idx) => ({
-          id: getStarterTaskId(user.id, idx),
+          id: getBaselineQuestUuid(user.id, q.quest_key),
           user_id: user.id,
+          quest_key: q.quest_key,
           title: q.title,
           category: q.category,
           target: q.target,
@@ -765,7 +775,7 @@ function App() {
         await supabase.from("tasks").upsert(seedTasks, { onConflict: "id" });
 
         const seedConcepts = STARTER_CONCEPTS.map((c, idx) => ({
-          id: getStarterTaskId(user.id, idx + 10),
+          id: getBaselineQuestUuid(user.id, `concept_${idx}`),
           user_id: user.id,
           title: c.title,
           subtitle: c.subtitle,

@@ -1,4 +1,4 @@
-const CACHE_NAME = "ascend-pwa-v10";
+const CACHE_NAME = "ascend-pwa-v11";
 const STATIC_ASSETS = [
   "/",
   "/index.html",

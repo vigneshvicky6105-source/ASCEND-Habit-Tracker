@@ -5,6 +5,7 @@
 create table if not exists public.tasks (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
+  quest_key text,
   title text not null,
   category text not null default 'Main Quest',
   target text default '',
@@ -13,7 +14,8 @@ create table if not exists public.tasks (
   active boolean not null default true,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique(user_id, quest_key)
 );
 
 -- 2. Task Completions History
@@ -120,12 +122,21 @@ drop policy if exists "side_quests own" on public.side_quests;
 create policy "side_quests own" on public.side_quests for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Migration safety helpers for existing tables
+alter table public.tasks add column if not exists quest_key text;
 alter table public.tasks add column if not exists locked boolean not null default false;
 alter table public.tasks add column if not exists category text not null default 'Main Quest';
 alter table public.tasks add column if not exists target text default '';
 alter table public.tasks add column if not exists xp integer not null default 10;
 alter table public.tasks add column if not exists active boolean not null default true;
 alter table public.tasks add column if not exists sort_order integer not null default 0;
+
+-- Database-level unique constraint to guarantee zero duplicates per user
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'unique_user_quest_key') then
+    alter table public.tasks add constraint unique_user_quest_key unique (user_id, quest_key);
+  end if;
+end $$;
 
 alter table public.books add column if not exists author text default '';
 alter table public.books add column if not exists start_date date;
