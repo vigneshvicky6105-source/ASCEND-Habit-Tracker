@@ -137,6 +137,15 @@ function setLocalBackup(userId, entity, data) {
   } catch (e) {}
 }
 
+function normalizeQuestSlug(quest) {
+  if (!quest) return "";
+  if (quest.quest_key) return quest.quest_key;
+  if (quest.title) {
+    return quest.title.replace(/\s+/g, " ").trim().toLowerCase();
+  }
+  return quest.id || "";
+}
+
 function getBaselineQuestUuid(userId, questKey) {
   if (!userId) return `00000000-0000-4000-8000-${String(questKey).replace(/[^0-9]/g, "").padStart(12, "0")}`;
   const cleanUid = userId.replace(/[^0-9a-f]/gi, "").padEnd(32, "0");
@@ -147,10 +156,8 @@ function getBaselineQuestUuid(userId, questKey) {
 function isTaskCompleted(task, dateKey, completions) {
   if (!task || !completions) return false;
   if (task.id && completions[`${task.id}:${dateKey}`]) return true;
-  if (task.title) {
-    const slug = task.title.trim().toLowerCase();
-    if (completions[`title:${slug}:${dateKey}`]) return true;
-  }
+  const slug = normalizeQuestSlug(task);
+  if (slug && completions[`title:${slug}:${dateKey}`]) return true;
   return false;
 }
 
@@ -473,7 +480,7 @@ function App() {
     const seen = new Set();
     const unique = [];
     raw.forEach(t => {
-      const slug = t && t.title ? t.title.trim().toLowerCase() : (t ? t.id : "");
+      const slug = normalizeQuestSlug(t);
       if (slug && !seen.has(slug)) {
         seen.add(slug);
         unique.push(t);
