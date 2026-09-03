@@ -204,10 +204,11 @@ function useUserOnlineState(user) {
         supabase.from("lending").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
         supabase.from("lending_installments").select("*").eq("user_id", userId).order("installment_number", { ascending: true }),
         supabase.from("lending_payments").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
-        supabase.from("whatsapp_reminders").select("*").eq("user_id", userId).order("created_at", { ascending: false })
+        supabase.from("whatsapp_reminders").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+        supabase.from("profile_settings").select("*").eq("user_id", userId).maybeSingle()
       ]);
 
-      const tableNames = ["tasks", "task_completions", "books", "wishlist", "core_concepts", "side_quests", "dues", "lending", "lending_installments", "lending_payments", "whatsapp_reminders"];
+      const tableNames = ["tasks", "task_completions", "books", "wishlist", "core_concepts", "side_quests", "dues", "lending", "lending_installments", "lending_payments", "whatsapp_reminders", "profile_settings"];
       const missing = [];
       results.forEach((res, idx) => {
         if (res.error && (res.error.code === "PGRST205" || res.status === 404 || (res.error.message && res.error.message.includes("schema cache")))) {
@@ -234,7 +235,8 @@ function useUserOnlineState(user) {
         { data: lending },
         { data: installments },
         { data: payments },
-        { data: reminders }
+        { data: reminders },
+        { data: profile }
       ] = results;
 
       const backupCompletions = getLocalBackup(userId, "completions", {});
@@ -254,12 +256,12 @@ function useUserOnlineState(user) {
       });
 
       let finalTasks = tasks || [];
-      
-      // Ensure all 9 baseline starter quests exist in finalTasks without duplicating
-      const existingKeys = new Set((finalTasks || []).map(t => normalizeQuestSlug(t)));
-      const missingBaselineTasks = STARTER_QUESTS
-        .filter(q => !existingKeys.has(q.quest_key) && !existingKeys.has(q.title.replace(/\s+/g, " ").trim().toLowerCase()))
-        .map((q, idx) => ({
+      const isAccountInitialized = profile && profile.initialized === true;
+
+      // Seed baseline starter quests ONLY IF the user account has never been initialized before
+      if (!isAccountInitialized && userId && !missing.includes("tasks")) {
+        console.log("[ASCEND SYNC] Brand new user account detected. Initializing baseline Main Quests once...");
+        const seedTasks = STARTER_QUESTS.map((q, idx) => ({
           id: getBaselineQuestUuid(userId, q.quest_key),
           user_id: userId,
           quest_key: q.quest_key,
@@ -269,21 +271,27 @@ function useUserOnlineState(user) {
           xp: q.xp,
           locked: q.locked,
           active: true,
-          sort_order: (finalTasks.length || 0) + idx,
+          sort_order: idx,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }));
 
-      if (missingBaselineTasks.length > 0 && userId && !missing.includes("tasks")) {
-        console.log(`[ASCEND SYNC] Seeding ${missingBaselineTasks.length} missing baseline quests into Supabase...`);
-        let { error: seedErr } = await supabase.from("tasks").upsert(missingBaselineTasks, { onConflict: "id" });
+        let { error: seedErr } = await supabase.from("tasks").upsert(seedTasks, { onConflict: "id" });
         if (seedErr) {
           console.warn("[ASCEND SYNC] Primary starter tasks seeding warning:", seedErr);
-          const fallbackSeed = missingBaselineTasks.map(({ quest_key, ...rest }) => rest);
+          const fallbackSeed = seedTasks.map(({ quest_key, ...rest }) => rest);
           const { error: fbErr } = await supabase.from("tasks").upsert(fallbackSeed, { onConflict: "id" });
           if (fbErr) console.error("[ASCEND SYNC] Fallback starter tasks seeding error:", fbErr);
         }
-        finalTasks = [...finalTasks, ...missingBaselineTasks];
+
+        // Mark account initialization complete in profile_settings
+        await supabase.from("profile_settings").upsert({
+          user_id: userId,
+          initialized: true,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "user_id" });
+
+        finalTasks = seedTasks;
       }
 
       // Deduplicate tasks strictly by normalized slug to eliminate any historical duplicate entries
@@ -818,6 +826,12 @@ function App() {
           created_at: new Date().toISOString()
         }));
         await supabase.from("core_concepts").upsert(seedConcepts, { onConflict: "id" });
+
+        await supabase.from("profile_settings").upsert({
+          user_id: user.id,
+          initialized: true,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "user_id" });
       }
 
       // Clear local backups and storage

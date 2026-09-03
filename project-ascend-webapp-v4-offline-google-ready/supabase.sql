@@ -71,6 +71,7 @@ create table if not exists public.profile_settings (
   user_id uuid primary key references auth.users(id) on delete cascade,
   display_name text default '',
   timezone text default 'Asia/Kolkata',
+  initialized boolean not null default false,
   updated_at timestamptz not null default now()
 );
 
@@ -129,6 +130,7 @@ alter table public.tasks add column if not exists target text default '';
 alter table public.tasks add column if not exists xp integer not null default 10;
 alter table public.tasks add column if not exists active boolean not null default true;
 alter table public.tasks add column if not exists sort_order integer not null default 0;
+alter table public.profile_settings add column if not exists initialized boolean not null default false;
 
 -- Database-level unique constraint to guarantee zero duplicates per user
 do $$
