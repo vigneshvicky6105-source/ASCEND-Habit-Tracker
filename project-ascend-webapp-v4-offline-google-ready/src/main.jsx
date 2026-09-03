@@ -1,12 +1,11 @@
-import React, { useEffect, useState, useMemo, Component } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
 import {
   Check, Flame, Plus, Settings, BookOpen, LogIn, LogOut, WifiOff, Cloud,
   Pencil, Trash2, ArrowUp, ArrowDown, Lock, Unlock, Calendar, Trophy,
   BarChart2, Sparkles, X, ChevronRight, RefreshCw, ShoppingCart, Target,
-  Layers, CheckCircle2, Circle, Swords, Shield, Clock, CalendarDays, Bell, BellOff,
-  Wallet, ArrowUpRight, ArrowDownLeft
+  Layers, CheckCircle2, Circle, Swords, Shield, Clock, CalendarDays, Bell, BellOff
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart,
@@ -21,15 +20,18 @@ const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUP
 
 // --- DEFAULT STARTER DATA ---
 const STARTER_QUESTS = [
-  { quest_key: "main_quest_01", title: "LeetCode + GeeksforGeeks", category: "Coding", target: "1 problem", xp: 10, locked: true },
-  { quest_key: "main_quest_02", title: "Check Mail", category: "Career/Admin", target: "1 check", xp: 5, locked: true },
-  { quest_key: "main_quest_03", title: "IT Learning", category: "Learning", target: "1 lesson", xp: 10, locked: false },
-  { quest_key: "main_quest_04", title: "Apply for Jobs — Naukri + Indeed", category: "Career", target: "1+ application", xp: 15, locked: true },
-  { quest_key: "main_quest_05", title: "Read 10 Pages", category: "Reading", target: "10 pages", xp: 10, locked: true },
-  { quest_key: "main_quest_06", title: "Post on LinkedIn", category: "Career/Brand", target: "1 post", xp: 8, locked: false },
-  { quest_key: "main_quest_07", title: "Create + Post Brainrot Videos", category: "Content", target: "1 video", xp: 10, locked: false },
-  { quest_key: "main_quest_08", title: "Core Concept Learning", category: "Learning", target: "1 concept", xp: 10, locked: true },
-  { quest_key: "main_quest_09", title: "Python Brush-Up", category: "Coding", target: "30 min", xp: 10, locked: true }
+  { title: "LeetCode + GeeksforGeeks", category: "Coding", target: "1 problem", xp: 10, locked: true },
+  { title: "Check Mail", category: "Career/Admin", target: "1 check", xp: 5, locked: true },
+  { title: "IT Learning", category: "Learning", target: "1 lesson", xp: 10, locked: false },
+  { title: "Apply for Jobs — Naukri + Indeed", category: "Career", target: "1+ application", xp: 15, locked: true },
+  { title: "Read 10 Pages", category: "Reading", target: "10 pages", xp: 10, locked: true },
+  { title: "Post on LinkedIn", category: "Career/Brand", target: "1 post", xp: 8, locked: false },
+  { title: "Create + Post Brainrot Videos", category: "Content", target: "1 video", xp: 10, locked: false },
+  { title: "Core Concept Learning", category: "Learning", target: "1 concept", xp: 10, locked: true },
+  { title: "Python Brush-Up", category: "Coding", target: "30 min", xp: 10, locked: true },
+  { title: "Drink 5L Water", category: "Health", target: "5 L", xp: 5, locked: true },
+  { title: "Record Yourself Explaining a Topic", category: "Communication", target: "1 video", xp: 10, locked: false },
+  { title: "Run 5 KM", category: "Fitness", target: "5 KM", xp: 7, locked: false }
 ];
 
 const STARTER_CONCEPTS = [
@@ -50,382 +52,279 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
 const PRIORITY_ORDER = { "High": 1, "Medium": 2, "Low": 3 };
 
 function getLevelRankTitle(level) {
-  if (level <= 1) return { title: "Novice Ascendant", icon: "🌱", color: "#a0aec0" };
-  if (level <= 3) return { title: "Disciplined Seeker", icon: "⚔️", color: "#48bb78" };
-  if (level <= 5) return { title: "Consistent Adventurer", icon: "🔥", color: "#ed8936" };
-  if (level <= 7) return { title: "Knowledge Builder", icon: "🧠", color: "#4299e1" };
-  if (level <= 9) return { title: "Data Warrior", icon: "💻", color: "#9f7aea" };
-  if (level <= 14) return { title: "Technical Champion", icon: "⚡", color: "#f5b942" };
-  return { title: "Grand Ascended Master", icon: "🚀", color: "#e53e3e" };
+  if (level <= 1) return { title: "Bronze III", icon: "🥉", color: "#cd7f32" };
+  if (level <= 2) return { title: "Bronze II", icon: "🥉", color: "#cd7f32" };
+  if (level <= 3) return { title: "Bronze I", icon: "🥉", color: "#cd7f32" };
+  if (level <= 4) return { title: "Silver III", icon: "🥈", color: "#c0c0c0" };
+  if (level <= 5) return { title: "Silver II", icon: "🥈", color: "#c0c0c0" };
+  if (level <= 6) return { title: "Silver I", icon: "🥈", color: "#c0c0c0" };
+  if (level <= 7) return { title: "Gold III", icon: "🥇", color: "#f5b942" };
+  if (level <= 8) return { title: "Gold II", icon: "🥇", color: "#f5b942" };
+  if (level <= 9) return { title: "Gold I", icon: "🥇", color: "#f5b942" };
+  if (level <= 11) return { title: "Crystal League", icon: "💎", color: "#a855f7" };
+  if (level <= 14) return { title: "Master League", icon: "🔮", color: "#ec4899" };
+  if (level <= 19) return { title: "Champion League", icon: "🏆", color: "#3b82f6" };
+  if (level <= 24) return { title: "Titan League", icon: "⚡", color: "#06b6d4" };
+  return { title: "Legend League", icon: "👑", color: "#eab308" };
 }
 
-// --- ONLINE LENDING & EMI MATH HELPERS ---
+// --- INDEXEDDB MULTI-USER ISOLATED STORAGE ---
+const DB_NAME = "project_ascend_v4_db";
+const DB_VERSION = 4;
+const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus"];
 
-// Exact monetary EMI calculation (money-safe paise arithmetic)
-function calculateEmiInstallments(principalAmount, emiCount, startDate, firstDueDate) {
-  const totalPaise = Math.round(Number(principalAmount) * 100);
-  const count = Math.max(1, parseInt(emiCount, 10) || 1);
-  const basePaise = Math.floor(totalPaise / count);
-  const remainderPaise = totalPaise - (basePaise * count);
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      STORES.forEach(s => {
+        if (!db.objectStoreNames.contains(s)) {
+          const store = db.createObjectStore(s, { keyPath: "id" });
+          store.createIndex("user_id", "user_id", { unique: false });
+        }
+      });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
 
-  const initialDueDate = firstDueDate || startDate || todayStr();
-  const installments = [];
-
-  for (let i = 1; i <= count; i++) {
-    const paise = (i === count) ? (basePaise + remainderPaise) : basePaise;
-    const amount = Number((paise / 100).toFixed(2));
-
-    const baseDate = new Date(initialDueDate + "T00:00:00");
-    baseDate.setMonth(baseDate.getMonth() + (i - 1));
-    const yyyy = baseDate.getFullYear();
-    const mm = String(baseDate.getMonth() + 1).padStart(2, '0');
-    const dd = String(baseDate.getDate()).padStart(2, '0');
-    const dueDateStr = `${yyyy}-${mm}-${dd}`;
-
-    installments.push({
-      installment_number: i,
-      due_date: dueDateStr,
-      amount: amount,
-      paid_amount: 0,
-      status: "Pending"
+async function idbGetUserRecords(storeName, userId) {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, "readonly");
+      const store = tx.objectStore(storeName);
+      const index = store.index("user_id");
+      const req = index.getAll(userId);
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
     });
+  } catch {
+    return [];
   }
-  return installments;
 }
 
-function normalizePhoneNumber(phone) {
-  if (!phone) return "";
-  let cleaned = phone.replace(/[^0-9+]/g, "");
-  if (!cleaned.startsWith("+") && cleaned.length === 10) {
-    cleaned = "+91" + cleaned;
-  }
-  return cleaned;
-}
-
-function deriveInstallmentStatus(inst, todayDate = todayStr()) {
-  const amount = Number(inst.amount) || 0;
-  const paidAmount = Number(inst.paid_amount) || 0;
-  if (paidAmount >= amount && amount > 0) return "Paid";
-  if (paidAmount > 0 && paidAmount < amount) return "Partially Paid";
-  if (inst.due_date && inst.due_date < todayDate) return "Overdue";
-  return inst.status || "Pending";
-}
-
-function generateEmiReminderText({ friend_name, emi_number, total_emis, emi_amount, due_date, remaining_amount }) {
-  const formattedAmount = Number(emi_amount).toLocaleString('en-IN');
-  const formattedRemaining = Number(remaining_amount).toLocaleString('en-IN');
-  return `Hey ${friend_name}, just a reminder that your EMI #${emi_number}${total_emis ? ` of ${total_emis}` : ''} of ₹${formattedAmount} is due on ${due_date}. Remaining balance: ₹${formattedRemaining}. Please send it when you get a chance. Thanks!`;
-}
-
-function getLocalBackupKey(userId, entity) {
-  const uid = userId || "guest";
-  return `ascend_online_backup_${uid}_${entity}`;
-}
-
-function getLocalBackup(userId, entity, fallback = {}) {
+async function idbSaveUserRecords(storeName, records, userId) {
   try {
-    const raw = localStorage.getItem(getLocalBackupKey(userId, entity));
-    return raw ? JSON.parse(raw) : fallback;
+    const db = await openDB();
+    const tx = db.transaction(storeName, "readwrite");
+    const store = tx.objectStore(storeName);
+    const index = store.index("user_id");
+    const getAllReq = index.getAllKeys(userId);
+    
+    getAllReq.onsuccess = () => {
+      const existingKeys = getAllReq.result || [];
+      existingKeys.forEach(k => store.delete(k));
+      records.forEach(r => store.put({ ...r, user_id: userId }));
+    };
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
   } catch (e) {
-    return fallback;
+    console.error("IDB save error:", e);
   }
 }
 
-function setLocalBackup(userId, entity, data) {
-  try {
-    localStorage.setItem(getLocalBackupKey(userId, entity), JSON.stringify(data));
-  } catch (e) {}
-}
-
-function normalizeQuestSlug(quest) {
-  if (!quest) return "";
-  if (quest.quest_key) return quest.quest_key;
-  if (quest.title) {
-    return quest.title.replace(/\s+/g, " ").trim().toLowerCase();
-  }
-  return quest.id || "";
-}
-
-function getBaselineQuestUuid(userId, questKey) {
-  if (!userId) return `00000000-0000-4000-8000-${String(questKey).replace(/[^0-9]/g, "").padStart(12, "0")}`;
-  const cleanUid = userId.replace(/[^0-9a-f]/gi, "").padEnd(32, "0");
-  const numKey = String(questKey || "0").replace(/[^0-9]/g, "").padStart(4, "0");
-  return `${cleanUid.slice(0, 8)}-${cleanUid.slice(8, 12)}-4000-a${numKey.slice(0, 3)}-${cleanUid.slice(16, 27)}${numKey.slice(3)}`;
-}
-
-function isTaskCompleted(task, dateKey, completions) {
-  if (!task || !completions) return false;
-  if (task.id && completions[`${task.id}:${dateKey}`]) return true;
-  const slug = normalizeQuestSlug(task);
-  if (slug && completions[`title:${slug}:${dateKey}`]) return true;
-  return false;
-}
-
-// Custom Hook for User-Scoped 100% Online Supabase State
-function useUserOnlineState(user) {
-  const userId = user?.id || null;
+// Custom Hook for User-Scoped Offline State
+function useUserLocalState(user) {
+  const userId = user?.id || "guest";
   const [state, setState] = useState({
     tasks: [],
-    completions: {},
+    completions: {}, // map key -> true ("taskId:YYYY-MM-DD")
     books: [],
     wishlist: [],
     concepts: [],
     side_quests: [],
     ai_chat_history: [],
-    challenges: STARTER_CHALLENGES,
-    daily_focus: {},
-    dues: [],
-    lending: [],
-    lending_installments: [],
-    lending_payments: [],
-    whatsapp_reminders: []
+    challenges: [],
+    daily_focus: {}
   });
   const [ready, setReady] = useState(false);
-  const [fetching, setFetching] = useState(false);
-  const [missingTables, setMissingTables] = useState([]);
-  const [syncStatus, setSyncStatus] = useState("connecting"); // "synced" | "syncing" | "error" | "connecting" | "db_setup_required"
 
-  const fetchOnlineData = async () => {
-    if (!supabase || !userId) {
-      setReady(true);
-      return;
-    }
-    setFetching(true);
-    setSyncStatus("syncing");
-    try {
-      const results = await Promise.all([
-        supabase.from("tasks").select("*").eq("user_id", userId).order("sort_order", { ascending: true }),
-        supabase.from("task_completions").select("*").eq("user_id", userId),
-        supabase.from("books").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
-        supabase.from("wishlist").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
-        supabase.from("core_concepts").select("*").eq("user_id", userId).order("sort_order", { ascending: true }),
-        supabase.from("side_quests").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
-        supabase.from("dues").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
-        supabase.from("lending").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
-        supabase.from("lending_installments").select("*").eq("user_id", userId).order("installment_number", { ascending: true }),
-        supabase.from("lending_payments").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
-        supabase.from("whatsapp_reminders").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
-        supabase.from("profile_settings").select("*").eq("user_id", userId).maybeSingle()
-      ]);
-
-      const tableNames = ["tasks", "task_completions", "books", "wishlist", "core_concepts", "side_quests", "dues", "lending", "lending_installments", "lending_payments", "whatsapp_reminders", "profile_settings"];
-      const missing = [];
-      results.forEach((res, idx) => {
-        if (res.error && (res.error.code === "PGRST205" || res.status === 404 || (res.error.message && res.error.message.includes("schema cache")))) {
-          missing.push(tableNames[idx]);
-        }
-      });
-
-      if (missing.length > 0) {
-        console.warn("⚠️ Missing Supabase tables detected in remote DB:", missing);
-        setMissingTables(missing);
-        setSyncStatus("db_setup_required");
-      } else {
-        setMissingTables([]);
-      }
-
-      const [
-        { data: tasks },
-        { data: completions },
-        { data: books },
-        { data: wishlist },
-        { data: concepts },
-        { data: sideQuests },
-        { data: dues },
-        { data: lending },
-        { data: installments },
-        { data: payments },
-        { data: reminders },
-        { data: profile }
-      ] = results;
-
-      const backupCompletions = getLocalBackup(userId, "completions", {});
-      const compMap = { ...backupCompletions };
-      const taskMapById = {};
-      (tasks || []).forEach(t => { if (t && t.id) taskMapById[t.id] = t; });
-
-      (completions || []).forEach(c => {
-        if (c && c.task_id && c.completed_on) {
-          compMap[`${c.task_id}:${c.completed_on}`] = true;
-          const matchedTask = taskMapById[c.task_id];
-          if (matchedTask && matchedTask.title) {
-            const titleSlug = matchedTask.title.trim().toLowerCase();
-            compMap[`title:${titleSlug}:${c.completed_on}`] = true;
-          }
-        }
-      });
-
-      let finalTasks = tasks || [];
-      const isAccountInitialized = profile && profile.initialized === true;
-
-      // Seed baseline starter quests ONLY IF the user account has never been initialized before
-      if (!isAccountInitialized && userId && !missing.includes("tasks")) {
-        console.log("[ASCEND SYNC] Brand new user account detected. Initializing baseline Main Quests once...");
-        const seedTasks = STARTER_QUESTS.map((q, idx) => ({
-          id: getBaselineQuestUuid(userId, q.quest_key),
-          user_id: userId,
-          quest_key: q.quest_key,
-          title: q.title,
-          category: q.category,
-          target: q.target,
-          xp: q.xp,
-          locked: q.locked,
-          active: true,
-          sort_order: idx,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
-
-        let { error: seedErr } = await supabase.from("tasks").upsert(seedTasks, { onConflict: "id" });
-        if (seedErr) {
-          console.warn("[ASCEND SYNC] Primary starter tasks seeding warning:", seedErr);
-          const fallbackSeed = seedTasks.map(({ quest_key, ...rest }) => rest);
-          const { error: fbErr } = await supabase.from("tasks").upsert(fallbackSeed, { onConflict: "id" });
-          if (fbErr) console.error("[ASCEND SYNC] Fallback starter tasks seeding error:", fbErr);
-        }
-
-        // Mark account initialization complete in profile_settings
-        await supabase.from("profile_settings").upsert({
-          user_id: userId,
-          initialized: true,
-          updated_at: new Date().toISOString()
-        }, { onConflict: "user_id" });
-
-        finalTasks = seedTasks;
-      }
-
-      // Deduplicate tasks strictly by normalized slug to eliminate any historical duplicate entries
-      const seenTaskKeys = new Set();
-      const dedupedTasks = [];
-      const duplicateTaskIds = [];
-
-      (finalTasks || []).forEach(t => {
-        if (!t) return;
-        const key = normalizeQuestSlug(t);
-        if (seenTaskKeys.has(key)) {
-          if (t.id) duplicateTaskIds.push(t.id);
-        } else {
-          seenTaskKeys.add(key);
-          dedupedTasks.push(t);
-        }
-      });
-
-      if (duplicateTaskIds.length > 0 && userId && supabase) {
-        console.log(`[ASCEND SYNC] Purging ${duplicateTaskIds.length} duplicate task IDs from cloud database...`);
-        supabase.from("tasks").delete().in("id", duplicateTaskIds).eq("user_id", userId).then(({ error }) => {
-          if (error) console.error("[ASCEND SYNC] Error purging duplicate tasks in DB:", error);
-          else console.log("[ASCEND SYNC] Duplicate tasks purged successfully from cloud database.");
-        });
-      }
-
-      finalTasks = dedupedTasks;
-
-      let finalConcepts = concepts || [];
-      if (finalConcepts.length === 0 && userId && !missing.includes("core_concepts")) {
-        const seedConcepts = STARTER_CONCEPTS.map((c, idx) => ({
-          id: getBaselineQuestUuid(userId, `concept_${idx}`),
-          user_id: userId,
-          title: c.title,
-          subtitle: c.subtitle,
-          sort_order: idx,
-          created_at: new Date().toISOString()
-        }));
-        const { error: cSeedErr } = await supabase.from("core_concepts").upsert(seedConcepts, { onConflict: "id" });
-        if (cSeedErr) console.error("[ASCEND SYNC] Starter concepts DB seeding error:", cSeedErr);
-        else finalConcepts = seedConcepts;
-      }
-
-      const debtsList = (dues || []).filter(d => (d.type || "owed") === "owed" || d.type === "debt");
-
-      setState({
-        tasks: finalTasks.length > 0 ? finalTasks : STARTER_QUESTS.map((q, idx) => ({ id: getBaselineQuestUuid(userId, q.quest_key), quest_key: q.quest_key, title: q.title, category: q.category, target: q.target, xp: q.xp, locked: q.locked, active: true, sort_order: idx })),
-        completions: compMap,
-        books: books || [],
-        wishlist: wishlist || [],
-        concepts: finalConcepts.length > 0 ? finalConcepts : STARTER_CONCEPTS.map((c, idx) => ({ id: getBaselineQuestUuid(userId, `concept_${idx}`), title: c.title, subtitle: c.subtitle, sort_order: idx })),
-        side_quests: sideQuests || [],
-        ai_chat_history: [],
-        challenges: STARTER_CHALLENGES,
-        daily_focus: {},
-        dues: debtsList,
-        lending: lending || [],
-        lending_installments: installments || [],
-        lending_payments: payments || [],
-        whatsapp_reminders: reminders || []
-      });
-      if (missing.length === 0) setSyncStatus("synced");
-    } catch (err) {
-      console.error("Supabase online data fetch error:", err);
-      setSyncStatus("error");
-    } finally {
-      setFetching(false);
-      setReady(true);
-    }
-  };
-
+  // Load from IndexedDB whenever active user changes
   useEffect(() => {
-    if (!userId) {
-      setState({
-        tasks: STARTER_QUESTS.map((q, idx) => ({ id: getBaselineQuestUuid(null, q.quest_key), quest_key: q.quest_key, title: q.title, category: q.category, target: q.target, xp: q.xp, locked: q.locked, active: true, sort_order: idx })),
-        completions: {},
-        books: [],
-        wishlist: [],
-        concepts: STARTER_CONCEPTS.map((c, idx) => ({ id: getBaselineQuestUuid(null, `concept_${idx}`), title: c.title, subtitle: c.subtitle, sort_order: idx })),
-        side_quests: [],
-        ai_chat_history: [],
-        challenges: STARTER_CHALLENGES,
-        daily_focus: {},
-        dues: [],
-        lending: [],
-        lending_installments: [],
-        lending_payments: [],
-        whatsapp_reminders: []
-      });
-      setReady(true);
-      setSyncStatus("synced");
-      return;
-    }
+    let active = true;
+    setReady(false);
 
-    fetchOnlineData();
+    async function load() {
+      try {
+        let [tasks, completionsArr, books, wishlist, concepts, sideQuestsArr, chatHistoryArr, challengesArr, dailyFocusArr] = await Promise.all(
+          STORES.map(s => idbGetUserRecords(s, userId))
+        );
+        if (!active) return;
 
-    let channel = null;
-    if (supabase) {
-      setSyncStatus("connecting");
-      channel = supabase
-        .channel(`ascend-user-sync-${userId}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "*", filter: `user_id=eq.${userId}` },
-          (payload) => {
-            console.log("⚡ Realtime event received:", payload.eventType, payload.table);
-            fetchOnlineData();
+        // AUTO-MIGRATE GUEST DATA TO LOGGED-IN USER ACCOUNT
+        if (userId !== "guest") {
+          const guestTasks = await idbGetUserRecords("tasks", "guest");
+          const guestCompletions = await idbGetUserRecords("completions", "guest");
+          const guestSideQuests = await idbGetUserRecords("side_quests", "guest");
+          const guestBooks = await idbGetUserRecords("books", "guest");
+          const guestWishlist = await idbGetUserRecords("wishlist", "guest");
+
+          const hasGuestData = (
+            (guestCompletions && guestCompletions.length > 0) ||
+            (guestSideQuests && guestSideQuests.length > 0) ||
+            (guestBooks && guestBooks.length > 0) ||
+            (guestWishlist && guestWishlist.length > 0) ||
+            (guestTasks && guestTasks.some(t => !t.id.startsWith("starter-")))
+          );
+
+          if (hasGuestData) {
+            console.log("Migrating guest offline data to user profile:", userId);
+            
+            // Merge tasks
+            const taskMap = new Map();
+            (tasks || []).forEach(t => taskMap.set(t.title, t));
+            (guestTasks || []).forEach(gt => {
+              if (!gt.id.startsWith("starter-") || !taskMap.has(gt.title)) {
+                taskMap.set(gt.title, { ...gt, user_id: userId });
+              }
+            });
+            tasks = Array.from(taskMap.values());
+
+            // Merge completions
+            const compMap = new Map();
+            (completionsArr || []).forEach(c => compMap.set(c.key || `${c.task_id}:${c.completed_on}`, c));
+            (guestCompletions || []).forEach(gc => compMap.set(gc.key || `${gc.task_id}:${gc.completed_on}`, { ...gc, user_id: userId }));
+            completionsArr = Array.from(compMap.values());
+
+            // Merge side quests
+            const sqMap = new Map();
+            (sideQuestsArr || []).forEach(sq => sqMap.set(sq.id, sq));
+            (guestSideQuests || []).forEach(gsq => sqMap.set(gsq.id, { ...gsq, user_id: userId }));
+            sideQuestsArr = Array.from(sqMap.values());
+
+            // Merge books
+            const bMap = new Map();
+            (books || []).forEach(b => bMap.set(b.id, b));
+            (guestBooks || []).forEach(gb => bMap.set(gb.id, { ...gb, user_id: userId }));
+            books = Array.from(bMap.values());
+
+            // Merge wishlist
+            const wMap = new Map();
+            (wishlist || []).forEach(w => wMap.set(w.id, w));
+            (guestWishlist || []).forEach(gw => wMap.set(gw.id, { ...gw, user_id: userId }));
+            wishlist = Array.from(wMap.values());
+
+            // Persist migrated records to IndexedDB for logged-in user
+            await Promise.all([
+              idbSaveUserRecords("tasks", tasks, userId),
+              idbSaveUserRecords("completions", completionsArr, userId),
+              idbSaveUserRecords("side_quests", sideQuestsArr, userId),
+              idbSaveUserRecords("books", books, userId),
+              idbSaveUserRecords("wishlist", wishlist, userId)
+            ]);
           }
-        )
-        .subscribe((status, err) => {
-          console.log(`🔌 Realtime subscription status: ${status}`, err || "");
-          if (status === "SUBSCRIBED") {
-            setSyncStatus("synced");
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            setSyncStatus("error");
-          } else if (status === "CLOSED") {
-            setSyncStatus("connecting");
-          }
+        }
+
+        const completionsMap = {};
+        completionsArr.forEach(c => {
+          completionsMap[c.key || `${c.task_id}:${c.completed_on}`] = true;
         });
 
-      const handleFocus = () => {
-        console.log("Window focused: refetching online state...");
-        fetchOnlineData();
-      };
-      window.addEventListener("focus", handleFocus);
+        // Initialize defaults if user has zero tasks
+        let finalTasks = tasks;
+        if (!finalTasks || finalTasks.length === 0) {
+          finalTasks = STARTER_QUESTS.map((q, idx) => ({
+            id: `starter-${idx}`,
+            user_id: userId,
+            title: q.title,
+            category: q.category,
+            target: q.target,
+            xp: q.xp,
+            locked: q.locked,
+            active: true,
+            sort_order: idx,
+            created_at: new Date().toISOString()
+          }));
+        }
 
-      return () => {
-        window.removeEventListener("focus", handleFocus);
-        if (channel) supabase.removeChannel(channel);
-      };
+        let finalConcepts = concepts;
+        if (!finalConcepts || finalConcepts.length === 0) {
+          finalConcepts = STARTER_CONCEPTS.map((c, idx) => ({
+            id: `concept-${idx}`,
+            user_id: userId,
+            title: c.title,
+            subtitle: c.subtitle,
+            sort_order: idx
+          }));
+        }
+
+        let finalChallenges = challengesArr;
+        if (!finalChallenges || finalChallenges.length === 0) {
+          finalChallenges = STARTER_CHALLENGES.map(c => ({ ...c, user_id: userId }));
+        }
+
+        const dailyFocusMap = {};
+        (dailyFocusArr || []).forEach(f => {
+          if (f.date) dailyFocusMap[f.date] = f.goal;
+        });
+
+        setState({
+          tasks: finalTasks,
+          completions: completionsMap,
+          books,
+          wishlist,
+          concepts: finalConcepts,
+          side_quests: sideQuestsArr || [],
+          ai_chat_history: chatHistoryArr || [],
+          challenges: finalChallenges,
+          daily_focus: dailyFocusMap
+        });
+        setReady(true);
+      } catch (err) {
+        console.error("Error loading local IndexedDB data:", err);
+        setReady(true);
+      }
     }
+
+    load();
+    return () => { active = false; };
   }, [userId]);
 
-  return [state, setState, ready, fetchOnlineData, fetching, syncStatus, missingTables];
+  // Persist state to IndexedDB on state changes
+  useEffect(() => {
+    if (!ready) return;
+    const save = async () => {
+      try {
+        await Promise.all([
+          idbSaveUserRecords("tasks", state.tasks, userId),
+          idbSaveUserRecords(
+            "completions",
+            Object.keys(state.completions).filter(k => state.completions[k]).map(k => {
+              const [task_id, completed_on] = k.split(":");
+              return { id: `${userId}:${k}`, key: k, task_id, completed_on, user_id: userId };
+            }),
+            userId
+          ),
+          idbSaveUserRecords("books", state.books, userId),
+          idbSaveUserRecords("wishlist", state.wishlist, userId),
+          idbSaveUserRecords("concepts", state.concepts, userId),
+          idbSaveUserRecords("side_quests", state.side_quests || [], userId),
+          idbSaveUserRecords("ai_chat_history", state.ai_chat_history || [], userId),
+          idbSaveUserRecords("challenges", state.challenges || [], userId),
+          idbSaveUserRecords(
+            "daily_focus",
+            Object.keys(state.daily_focus || {}).map(d => ({
+              id: `${userId}:${d}`,
+              date: d,
+              goal: state.daily_focus[d],
+              user_id: userId
+            })),
+            userId
+          )
+        ]);
+      } catch (e) {
+        console.error("Error saving state to IndexedDB:", e);
+      }
+    };
+    save();
+  }, [state, ready, userId]);
+
+  return [state, setState, ready, userId];
 }
 
 // --- MAIN APPLICATION COMPONENT ---
@@ -441,10 +340,6 @@ function App() {
   const [wishlistModal, setWishlistModal] = useState(null); // null | { isNew: bool, item: obj }
   const [conceptModal, setConceptModal] = useState(null); // null | { isNew: bool, concept: obj }
   const [sideQuestModal, setSideQuestModal] = useState(null); // null | { isNew: bool, quest?: obj, defaultDate?: string }
-  const [dueModal, setDueModal] = useState(null); // null | { isNew: bool, due?: obj, defaultType?: string }
-  const [lendingModal, setLendingModal] = useState(null); // null | { isNew: bool, lending?: obj }
-  const [lendingDetailModal, setLendingDetailModal] = useState(null); // null | { lending: obj }
-  const [emiPaymentModal, setEmiPaymentModal] = useState(null); // null | { installment: obj, lending: obj }
   const [questSubTab, setQuestSubTab] = useState("main"); // "main" | "side"
   const [notifPermission, setNotifPermission] = useState(() => {
     try {
@@ -455,9 +350,9 @@ function App() {
   });
   const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem("ascend_gemini_api_key") || "");
 
-  const [local, setLocal, localReady, fetchOnlineData, isFetchingOnline, syncStatus, missingTables] = useUserOnlineState(user);
+  const [local, setLocal, localReady, userId] = useUserLocalState(user);
 
-  // Service worker registration & online listener & Auth State listener
+  // Service worker registration & online listener
   useEffect(() => {
     const handleOnline = () => setOnline(true);
     const handleOffline = () => setOnline(false);
@@ -471,12 +366,140 @@ function App() {
     if (supabase) {
       supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
       const { data } = supabase.auth.onAuthStateChange((_e, s) => setUser(s?.user || null));
+      return () => {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+        data?.subscription?.unsubscribe();
+      };
     }
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
   }, []);
+
+  // Supabase Cloud Synchronization Logic
+  async function syncWithCloud() {
+    if (!supabase || !user || !online || !localReady) return;
+    setSyncing(true);
+    try {
+      const uid = user.id;
+
+      // 1. Fetch Cloud Tasks
+      const { data: cloudTasks } = await supabase.from("tasks").select("*").eq("user_id", uid);
+      if (cloudTasks && cloudTasks.length > 0) {
+        // Merge strategy: map local & cloud tasks by id
+        const mergedMap = new Map();
+        local.tasks.forEach(t => mergedMap.set(t.id, t));
+        cloudTasks.forEach(ct => mergedMap.set(ct.id, ct));
+        const mergedTasks = Array.from(mergedMap.values());
+        setLocal(s => ({ ...s, tasks: mergedTasks }));
+      }
+      
+      // Upsert current local tasks to Supabase
+      if (local.tasks.length > 0) {
+        await supabase.from("tasks").upsert(
+          local.tasks.map(t => ({
+            id: t.id.startsWith("starter-") ? undefined : t.id,
+            user_id: uid,
+            title: t.title,
+            category: t.category,
+            target: t.target || "",
+            xp: t.xp || 10,
+            locked: !!t.locked,
+            active: t.active !== false,
+            sort_order: t.sort_order || 0
+          })),
+          { onConflict: "id" }
+        );
+      }
+
+      // 2. Task Completions Sync
+      const completionRows = Object.keys(local.completions)
+        .filter(k => local.completions[k])
+        .map(k => {
+          const [task_id, completed_on] = k.split(":");
+          return { user_id: uid, task_id, completed_on };
+        });
+      if (completionRows.length > 0) {
+        await supabase.from("task_completions").upsert(completionRows, {
+          onConflict: "user_id,task_id,completed_on"
+        });
+      }
+
+      // 3. Books Sync
+      if (local.books.length > 0) {
+        await supabase.from("books").upsert(
+          local.books.map(b => ({
+            id: b.id.startsWith("book-") ? undefined : b.id,
+            user_id: uid,
+            title: b.title,
+            author: b.author || "",
+            start_date: b.start_date || null,
+            completed_date: b.completed_date || null,
+            current_page: b.current_page || 0,
+            total_pages: b.total_pages || 0,
+            status: b.status || "Reading",
+            notes: b.notes || ""
+          }))
+        );
+      }
+
+      // 4. Wishlist Sync
+      if (local.wishlist.length > 0) {
+        await supabase.from("wishlist").upsert(
+          local.wishlist.map(w => ({
+            id: w.id.startsWith("wish-") ? undefined : w.id,
+            user_id: uid,
+            item: w.item,
+            category: w.category || "General",
+            estimated_cost: w.estimated_cost || 0,
+            priority: w.priority || "Medium",
+            purchased: !!w.purchased,
+            notes: w.notes || ""
+          }))
+        );
+      }
+
+      // 5. Side Quests Sync
+      if (local.side_quests && local.side_quests.length > 0) {
+        const { data: cloudSideQuests } = await supabase.from("side_quests").select("*").eq("user_id", uid);
+        if (cloudSideQuests && cloudSideQuests.length > 0) {
+          const sqMap = new Map();
+          local.side_quests.forEach(sq => sqMap.set(sq.id, sq));
+          cloudSideQuests.forEach(csq => sqMap.set(csq.id, csq));
+          setLocal(s => ({ ...s, side_quests: Array.from(sqMap.values()) }));
+        }
+        await supabase.from("side_quests").upsert(
+          local.side_quests.map(sq => ({
+            id: (sq.id && !sq.id.startsWith("sq-")) ? sq.id : undefined,
+            user_id: uid,
+            title: sq.title,
+            description: sq.description || "",
+            date: sq.date || todayStr(),
+            priority: sq.priority || "Medium",
+            due_time: sq.due_time || "",
+            category: sq.category || "General",
+            completed: !!sq.completed,
+            created_at: sq.created_at || new Date().toISOString(),
+            completed_at: sq.completed_at || null
+          }))
+        );
+      }
+    } catch (err) {
+      console.warn("Cloud sync deferred:", err);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  // Auto sync on state changes when online & logged in
+  useEffect(() => {
+    if (user && online && localReady) {
+      const timer = setTimeout(() => syncWithCloud(), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [user, online, localReady, local.tasks, local.completions, local.books, local.wishlist, local.side_quests]);
 
   // Auth Handlers
   async function handleGoogleLogin() {
@@ -495,906 +518,213 @@ function App() {
     setUser(null);
   }
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if ((params.get("reset") === "1" || params.get("clear") === "1") && user) {
-      if (confirm("⚠️ Clear and Reset all database tracking data for your account?")) {
-        clearAllUserData();
-      }
-    }
-  }, [user]);
-
-  // --- QUEST ACTIONS (100% ONLINE CLOUD MUTATIONS) ---
+  // --- QUEST ACTIONS ---
   const activeTasks = useMemo(() => {
-    const raw = (local.tasks || []).filter(t => t && typeof t === "object" && t.active !== false);
-    const seen = new Set();
-    const unique = [];
-    raw.forEach(t => {
-      const slug = normalizeQuestSlug(t);
-      if (slug && !seen.has(slug)) {
-        seen.add(slug);
-        unique.push(t);
-      }
-    });
-    return unique.sort((a, b) => ((a && a.sort_order) || 0) - ((b && b.sort_order) || 0));
+    return local.tasks
+      .filter(t => t.active !== false)
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   }, [local.tasks]);
 
-  const toggleTaskCompletion = async (task) => {
-    if (!user) {
-      alert("Please sign in with Google to complete quests.");
-      return;
-    }
-    const today = todayStr();
-    let targetTaskId = task.id;
-
-    // Check if a task with the same title already exists in Supabase DB
-    const normTitle = (task.title || "").trim().toLowerCase();
-    const { data: existingTasks } = await supabase
-      .from("tasks")
-      .select("id, title")
-      .eq("user_id", user.id);
-
-    const titleMatch = (existingTasks || []).find(t => t.title && t.title.trim().toLowerCase() === normTitle);
-
-    if (titleMatch) {
-      targetTaskId = titleMatch.id;
-    } else {
-      const isStandardUuid = typeof task.id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(task.id);
-      if (!isStandardUuid) {
-        targetTaskId = crypto.randomUUID();
-      }
-
-      const taskPayload = {
-        id: targetTaskId,
-        user_id: user.id,
-        title: task.title,
-        category: task.category || "Main Quest",
-        target: task.target || "",
-        xp: task.xp || 10,
-        locked: !!task.locked,
-        active: true,
-        sort_order: task.sort_order || 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      const { error: tErr } = await supabase.from("tasks").upsert([taskPayload], { onConflict: "id" });
-      if (tErr) console.error("Failed to insert task before completion:", tErr);
-    }
-
-    const key = `${targetTaskId}:${today}`;
-    const origKey = `${task.id}:${today}`;
-    const isCurrentlyCompleted = !!(local.completions && (local.completions[key] || local.completions[origKey]));
-
-    // 1. Optimistic Local State Update immediately
+  const toggleTaskCompletion = (task) => {
+    const key = `${task.id}:${todayStr()}`;
     setLocal(s => {
-      const completions = { ...(s.completions || {}) };
-      const titleSlug = task.title ? task.title.trim().toLowerCase() : "";
-      const titleKey = titleSlug ? `title:${titleSlug}:${today}` : null;
-
-      if (isCurrentlyCompleted) {
-        delete completions[key];
-        delete completions[origKey];
-        if (titleKey) delete completions[titleKey];
-      } else {
-        completions[key] = true;
-        if (titleKey) completions[titleKey] = true;
-      }
-      setLocalBackup(user?.id, "completions", completions);
-      return {
-        ...s,
-        tasks: (s.tasks || []).map(t => (t.id === task.id ? { ...t, id: targetTaskId } : t)),
-        completions
-      };
+      const completions = { ...s.completions };
+      completions[key] = !completions[key];
+      return { ...s, completions };
     });
-
-    // 2. Async Supabase Database Mutation
-    if (isCurrentlyCompleted) {
-      const { error } = await supabase
-        .from("task_completions")
-        .delete()
-        .eq("task_id", targetTaskId)
-        .eq("completed_on", today)
-        .eq("user_id", user.id);
-
-      if (error) console.error("Cloud task completion delete error:", error);
-    } else {
-      const payload = {
-        id: crypto.randomUUID(),
-        user_id: user.id,
-        task_id: targetTaskId,
-        completed_on: today,
-        created_at: new Date().toISOString()
-      };
-      const { error } = await supabase.from("task_completions").insert([payload]);
-      if (error) {
-        console.error("Cloud task completion insert error:", error);
-        alert("⚠️ Cloud sync notice: " + (error.message || "Failed to save completion to cloud database. Ensure SQL tables are created."));
-      }
-    }
-    fetchOnlineData();
   };
 
-  const toggleTaskLock = async (task) => {
-    if (!user) return;
-    const { error } = await supabase
-      .from("tasks")
-      .update({ locked: !task.locked, updated_at: new Date().toISOString() })
-      .eq("id", task.id)
-      .eq("user_id", user.id);
-
-    if (error) console.error("Cloud task lock update error:", error);
-    fetchOnlineData();
+  const toggleTaskLock = (task) => {
+    setLocal(s => ({
+      ...s,
+      tasks: s.tasks.map(t => (t.id === task.id ? { ...t, locked: !t.locked } : t))
+    }));
   };
 
-  const moveTaskOrder = async (index, direction) => {
-    if (!user) return;
+  const moveTaskOrder = (index, direction) => {
     const targetIdx = index + direction;
     if (targetIdx < 0 || targetIdx >= activeTasks.length) return;
     const itemA = activeTasks[index];
     const itemB = activeTasks[targetIdx];
 
+    // Check if either is locked
     if (itemA.locked || itemB.locked) {
       alert("Cannot reorder locked quests. Unlock them first.");
       return;
     }
 
-    const { error: errA } = await supabase
-      .from("tasks")
-      .update({ sort_order: itemB.sort_order, updated_at: new Date().toISOString() })
-      .eq("id", itemA.id)
-      .eq("user_id", user.id);
+    const updated = [...local.tasks];
+    const idxA = updated.findIndex(t => t.id === itemA.id);
+    const idxB = updated.findIndex(t => t.id === itemB.id);
 
-    const { error: errB } = await supabase
-      .from("tasks")
-      .update({ sort_order: itemA.sort_order, updated_at: new Date().toISOString() })
-      .eq("id", itemB.id)
-      .eq("user_id", user.id);
+    const tempOrder = updated[idxA].sort_order;
+    updated[idxA].sort_order = updated[idxB].sort_order;
+    updated[idxB].sort_order = tempOrder;
 
-    if (errA || errB) console.error("Cloud reorder error:", errA || errB);
-    fetchOnlineData();
+    setLocal(s => ({ ...s, tasks: updated }));
   };
 
-  const saveQuestModal = async (questData) => {
-    if (!user) {
-      alert("Please sign in with Google to save quests to your account.");
-      return;
-    }
-    const normTitle = questData.title.trim().toLowerCase();
-    const existingTask = (local.tasks || []).find(t => t && t.title && t.title.trim().toLowerCase() === normTitle);
-
-    let taskId = questData.id;
+  const saveQuestModal = (questData) => {
     if (questData.isNew) {
-      taskId = existingTask ? existingTask.id : crypto.randomUUID();
+      const newTask = {
+        id: crypto.randomUUID(),
+        user_id: userId,
+        title: questData.title,
+        category: questData.category || "Main Quest",
+        target: questData.target || "",
+        xp: parseInt(questData.xp, 10) || 10,
+        locked: !!questData.locked,
+        active: true,
+        sort_order: activeTasks.length,
+        created_at: new Date().toISOString()
+      };
+      setLocal(s => ({ ...s, tasks: [...s.tasks, newTask] }));
     } else {
-      taskId = taskId || crypto.randomUUID();
+      setLocal(s => ({
+        ...s,
+        tasks: s.tasks.map(t =>
+          t.id === questData.id
+            ? {
+                ...t,
+                title: questData.title,
+                category: questData.category,
+                target: questData.target,
+                xp: parseInt(questData.xp, 10) || 10,
+                locked: questData.locked
+              }
+            : t
+        )
+      }));
     }
-
-    const payload = {
-      id: taskId,
-      user_id: user.id,
-      title: questData.title.trim(),
-      category: questData.category || "Main Quest",
-      target: questData.target || "",
-      xp: parseInt(questData.xp, 10) || 10,
-      locked: !!questData.locked,
-      active: true,
-      sort_order: questData.isNew ? activeTasks.length : (questData.sort_order || 0),
-      updated_at: new Date().toISOString()
-    };
-
     setQuestModal(null);
-    const { error } = await supabase.from("tasks").upsert([payload], { onConflict: "id" });
-    if (error) {
-      console.error("Cloud quest save error:", error);
-      alert("Cloud quest save error: " + error.message);
-    } else {
-      fetchOnlineData();
-    }
   };
 
-  const deleteTask = async (taskId) => {
-    if (!user) return;
-    const task = (local.tasks || []).find(t => t.id === taskId);
+  const deleteTask = (taskId) => {
+    const task = local.tasks.find(t => t.id === taskId);
     if (!task) return;
     if (task.locked) {
       alert("This quest is locked 🔒. Unlock it on the EDIT QUESTS page before deleting.");
       return;
     }
-    const qKey = task.quest_key || null;
-    const normTitle = task.title ? task.title.trim().toLowerCase() : "";
-
-    if (confirm(`Are you sure you want to delete "${task.title}" from your Cloud account?`)) {
-      console.log(`[ASCEND SYNC] Deleting task id=${taskId}, quest_key=${qKey}, title="${normTitle}" for user=${user.id}`);
-
-      const duplicateIds = (local.tasks || [])
-        .filter(t => t && ((qKey && t.quest_key === qKey) || (t.title && t.title.trim().toLowerCase() === normTitle)))
-        .map(t => t.id);
-
-      const idsToDelete = duplicateIds.length > 0 ? duplicateIds : [taskId];
-      const { error } = await supabase
-        .from("tasks")
-        .delete()
-        .in("id", idsToDelete)
-        .eq("user_id", user.id);
-
-      if (error) {
-        console.error("[ASCEND SYNC] Cloud quest delete error:", error);
-        alert("Failed to delete task from cloud database: " + error.message);
-      } else {
-        console.log("[ASCEND SYNC] Task deleted successfully from cloud database.");
-        fetchOnlineData();
-      }
-    }
-  };
-
-  const purgeDuplicateTasks = async () => {
-    if (!user || !supabase) {
-      alert("Please sign in with Google to purge cloud duplicates.");
-      return;
-    }
-    const { data: allTasks, error } = await supabase
-      .from("tasks")
-      .select("id, title")
-      .eq("user_id", user.id);
-
-    if (error || !allTasks) {
-      alert("Error fetching tasks for purge: " + (error?.message || "Unknown error"));
-      return;
-    }
-
-    const seen = new Set();
-    const idsToDelete = [];
-    allTasks.forEach(t => {
-      if (!t || !t.title) return;
-      const slug = t.title.trim().toLowerCase();
-      if (seen.has(slug)) {
-        idsToDelete.push(t.id);
-      } else {
-        seen.add(slug);
-      }
-    });
-
-    if (idsToDelete.length > 0) {
-      const { error: delErr } = await supabase.from("tasks").delete().in("id", idsToDelete);
-      if (delErr) {
-        console.error("Failed to purge duplicate tasks:", delErr);
-        alert("Purge error: " + delErr.message);
-      } else {
-        alert(`🧹 Successfully purged ${idsToDelete.length} duplicate quest entry/entries from your cloud database!`);
-        fetchOnlineData();
-      }
-    } else {
-      alert("✨ No duplicate quests found in your cloud account!");
-    }
-  };
-
-  const clearAllUserData = async () => {
-    if (!confirm("⚠️ DANGER: Are you sure you want to permanently delete ALL saved quests, completions, books, wishlist items, dues, and lending records from your account and start fresh?")) {
-      return;
-    }
-
-    try {
-      if (user && supabase) {
-        const tables = [
-          "task_completions",
-          "tasks",
-          "books",
-          "wishlist",
-          "core_concepts",
-          "side_quests",
-          "dues",
-          "lending_payments",
-          "lending_installments",
-          "lending",
-          "whatsapp_reminders",
-          "profile_settings"
-        ];
-
-        for (const table of tables) {
-          await supabase.from(table).delete().eq("user_id", user.id);
-        }
-
-        // Re-seed initial clean 9 baseline starter quests for the user with deterministic UUIDs & quest_key
-        const seedTasks = STARTER_QUESTS.map((q, idx) => ({
-          id: getBaselineQuestUuid(user.id, q.quest_key),
-          user_id: user.id,
-          quest_key: q.quest_key,
-          title: q.title,
-          category: q.category,
-          target: q.target,
-          xp: q.xp,
-          locked: q.locked,
-          active: true,
-          sort_order: idx,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
-
-        let { error: seedErr } = await supabase.from("tasks").upsert(seedTasks, { onConflict: "id" });
-        if (seedErr) {
-          console.warn("[ASCEND SYNC] Reset starter tasks seeding warning:", seedErr);
-          const fallbackSeed = seedTasks.map(({ quest_key, ...rest }) => rest);
-          await supabase.from("tasks").upsert(fallbackSeed, { onConflict: "id" });
-        }
-
-        const seedConcepts = STARTER_CONCEPTS.map((c, idx) => ({
-          id: getBaselineQuestUuid(user.id, `concept_${idx}`),
-          user_id: user.id,
-          title: c.title,
-          subtitle: c.subtitle,
-          sort_order: idx,
-          created_at: new Date().toISOString()
-        }));
-        await supabase.from("core_concepts").upsert(seedConcepts, { onConflict: "id" });
-
-        await supabase.from("profile_settings").upsert({
-          user_id: user.id,
-          initialized: true,
-          updated_at: new Date().toISOString()
-        }, { onConflict: "user_id" });
-      }
-
-      // Clear local backups and storage
-      try {
-        localStorage.clear();
-        sessionStorage.clear();
-      } catch (e) {}
-
-      alert("🧹 Account successfully reset! All data cleared and fresh starter quests initialized.");
-      fetchOnlineData();
-      window.location.reload();
-    } catch (err) {
-      console.error("Reset data error:", err);
-      alert("Error resetting data: " + err.message);
+    if (confirm(`Are you sure you want to delete "${task.title}"?`)) {
+      setLocal(s => ({
+        ...s,
+        tasks: s.tasks.map(t => (t.id === taskId ? { ...t, active: false } : t))
+      }));
     }
   };
 
   // --- CORE CONCEPTS ACTIONS ---
-  const saveConceptModal = async (conceptData) => {
-    if (!user) {
-      alert("Please sign in with Google to save core concepts.");
-      return;
-    }
-    const conceptId = conceptData.isNew ? crypto.randomUUID() : (conceptData.id || crypto.randomUUID());
-    const payload = {
-      id: conceptId,
-      user_id: user.id,
-      title: conceptData.title.trim(),
-      subtitle: conceptData.subtitle || "Daily learning target",
-      sort_order: conceptData.isNew ? (local.concepts || []).length : (conceptData.sort_order || 0)
-    };
-
-    setConceptModal(null);
-    const { error } = await supabase.from("core_concepts").upsert([payload], { onConflict: "id" });
-    if (error) {
-      console.error("Cloud concept save error:", error);
-      alert("Cloud concept save error: " + error.message);
+  const saveConceptModal = (conceptData) => {
+    if (conceptData.isNew) {
+      const newConcept = {
+        id: crypto.randomUUID(),
+        user_id: userId,
+        title: conceptData.title,
+        subtitle: conceptData.subtitle || "Daily learning target",
+        sort_order: local.concepts.length
+      };
+      setLocal(s => ({ ...s, concepts: [...s.concepts, newConcept] }));
     } else {
-      fetchOnlineData();
+      setLocal(s => ({
+        ...s,
+        concepts: s.concepts.map(c =>
+          c.id === conceptData.id
+            ? { ...c, title: conceptData.title, subtitle: conceptData.subtitle }
+            : c
+        )
+      }));
     }
+    setConceptModal(null);
   };
 
-  const deleteConcept = async (conceptId) => {
-    if (!user) return;
-    if (confirm("Delete this core concept target from your Cloud account?")) {
-      const { error } = await supabase.from("core_concepts").delete().eq("id", conceptId).eq("user_id", user.id);
-      if (error) console.error("Cloud concept delete error:", error);
-      fetchOnlineData();
+  const deleteConcept = (conceptId) => {
+    if (confirm("Delete this core concept target?")) {
+      setLocal(s => ({
+        ...s,
+        concepts: s.concepts.filter(c => c.id !== conceptId)
+      }));
     }
   };
 
   // --- SIDE QUEST ACTIONS ---
-  const saveSideQuestModal = async (sqData) => {
-    if (!user) {
-      alert("Please sign in with Google to save side quests.");
-      return;
+  const saveSideQuestModal = (sqData) => {
+    if (sqData.isNew) {
+      const newSq = {
+        id: crypto.randomUUID(),
+        user_id: userId,
+        title: sqData.title,
+        description: sqData.description || "",
+        date: sqData.date || todayStr(),
+        priority: sqData.priority || "Medium",
+        due_time: sqData.due_time || "",
+        category: sqData.category || "General",
+        completed: false,
+        created_at: new Date().toISOString(),
+        completed_at: null
+      };
+      setLocal(s => ({ ...s, side_quests: [...(s.side_quests || []), newSq] }));
+    } else {
+      setLocal(s => ({
+        ...s,
+        side_quests: (s.side_quests || []).map(sq =>
+          sq.id === sqData.id ? { ...sq, ...sqData } : sq
+        )
+      }));
     }
-    const sqId = sqData.isNew ? crypto.randomUUID() : (sqData.id || crypto.randomUUID());
-    const payload = {
-      id: sqId,
-      user_id: user.id,
-      title: sqData.title.trim(),
-      description: sqData.description || "",
-      date: sqData.date || todayStr(),
-      priority: sqData.priority || "Medium",
-      due_time: sqData.due_time || "",
-      category: sqData.category || "General",
-      completed: !!sqData.completed,
-      created_at: sqData.created_at || new Date().toISOString(),
-      completed_at: sqData.completed ? (sqData.completed_at || new Date().toISOString()) : null
-    };
-
     setSideQuestModal(null);
-    const { error } = await supabase.from("side_quests").upsert([payload], { onConflict: "id" });
-    if (error) {
-      console.error("Cloud side quest save error:", error);
-      alert("Cloud side quest save error: " + error.message);
-    } else {
-      fetchOnlineData();
-    }
   };
 
-  const toggleSideQuestCompletion = async (sqId) => {
-    if (!user) return;
-    const sq = (local.side_quests || []).find(s => s.id === sqId);
-    if (!sq) return;
-    const nextState = !sq.completed;
-
-    const { error } = await supabase
-      .from("side_quests")
-      .update({
-        completed: nextState,
-        completed_at: nextState ? new Date().toISOString() : null
+  const toggleSideQuestCompletion = (sqId) => {
+    setLocal(s => ({
+      ...s,
+      side_quests: (s.side_quests || []).map(sq => {
+        if (sq.id === sqId) {
+          const nextState = !sq.completed;
+          return {
+            ...sq,
+            completed: nextState,
+            completed_at: nextState ? new Date().toISOString() : null
+          };
+        }
+        return sq;
       })
-      .eq("id", sqId)
-      .eq("user_id", user.id);
-
-    if (error) console.error("Cloud side quest toggle error:", error);
-    fetchOnlineData();
-  };
-
-  const deleteSideQuest = async (sqId) => {
-    if (!user) return;
-    if (confirm("Are you sure you want to delete this Side Quest from your Cloud account?")) {
-      const { error } = await supabase.from("side_quests").delete().eq("id", sqId).eq("user_id", user.id);
-      if (error) console.error("Cloud side quest delete error:", error);
-      fetchOnlineData();
-    }
-  };
-
-  const recoverSideQuest = async (sqId) => {
-    if (!user) return;
-    if (confirm("Recover this failed quest? You will earn 50% XP without altering past activity records.")) {
-      const { error } = await supabase
-        .from("side_quests")
-        .update({
-          completed: true,
-          recovered: true,
-          completed_at: new Date().toISOString()
-        })
-        .eq("id", sqId)
-        .eq("user_id", user.id);
-
-      if (error) console.error("Cloud side quest recover error:", error);
-      fetchOnlineData();
-    }
-  };
-
-  const updateDailyFocus = async (goal) => {
-    if (!user) return;
-    const payload = {
-      user_id: user.id,
-      display_name: goal,
-      updated_at: new Date().toISOString()
-    };
-    const { error } = await supabase.from("profile_settings").upsert([payload], { onConflict: "user_id" });
-    if (error) console.error("Cloud daily focus update error:", error);
-    fetchOnlineData();
-  };
-
-  // --- BOOK ACTIONS ---
-  const saveBookModal = async (bookData) => {
-    if (!user) {
-      alert("Please sign in with Google to save books to your cloud library.");
-      return;
-    }
-    const bookId = bookData.isNew ? crypto.randomUUID() : (bookData.id || crypto.randomUUID());
-    const payload = {
-      id: bookId,
-      user_id: user.id,
-      title: bookData.title.trim(),
-      author: bookData.author || "",
-      start_date: bookData.start_date || todayStr(),
-      completed_date: bookData.completed_date || null,
-      current_page: parseInt(bookData.current_page, 10) || 0,
-      total_pages: parseInt(bookData.total_pages, 10) || 0,
-      status: bookData.status || "Reading",
-      notes: bookData.notes || ""
-    };
-
-    setBookModal(null);
-    const { error } = await supabase.from("books").upsert([payload], { onConflict: "id" });
-    if (error) {
-      console.error("Cloud book save error:", error);
-      alert("Cloud book save error: " + error.message);
-    } else {
-      fetchOnlineData();
-    }
-  };
-
-  const deleteBook = async (bookId) => {
-    if (!user) return;
-    if (confirm("Delete this book entry from your Cloud account?")) {
-      const { error } = await supabase.from("books").delete().eq("id", bookId).eq("user_id", user.id);
-      if (error) console.error("Cloud book delete error:", error);
-      fetchOnlineData();
-    }
-  };
-
-  // --- WISHLIST ACTIONS ---
-  const saveWishlistModal = async (itemData) => {
-    if (!user) {
-      alert("Please sign in with Google to save wishlist items.");
-      return;
-    }
-    const itemId = itemData.isNew ? crypto.randomUUID() : (itemData.id || crypto.randomUUID());
-    const payload = {
-      id: itemId,
-      user_id: user.id,
-      item: itemData.item.trim(),
-      category: itemData.category || "General",
-      estimated_cost: parseFloat(itemData.estimated_cost) || 0,
-      priority: itemData.priority || "Medium",
-      purchased: !!itemData.purchased,
-      notes: itemData.notes || ""
-    };
-
-    setWishlistModal(null);
-    const { error } = await supabase.from("wishlist").upsert([payload], { onConflict: "id" });
-    if (error) {
-      console.error("Cloud wishlist save error:", error);
-      alert("Cloud wishlist save error: " + error.message);
-    } else {
-      fetchOnlineData();
-    }
-  };
-
-  const deleteWishlistItem = async (itemId) => {
-    if (!user) return;
-    if (confirm("Delete this wishlist item from your Cloud account?")) {
-      const { error } = await supabase.from("wishlist").delete().eq("id", itemId).eq("user_id", user.id);
-      if (error) console.error("Cloud wishlist delete error:", error);
-      fetchOnlineData();
-    }
-  };
-
-  // --- DUES & LENDING ACTIONS (100% DIRECT ONLINE CLOUD MUTATIONS) ---
-  const saveDueModal = async (dueData) => {
-    if (!user) {
-      alert("Please sign in with Google to save debt records to your account.");
-      return;
-    }
-    const dueId = dueData.isNew ? crypto.randomUUID() : (dueData.id || crypto.randomUUID());
-    const status = (dueData.status === "Settled" || dueData.status === "Paid") ? "Paid" : "Pending";
-
-    const payload = {
-      id: dueId,
-      user_id: user.id,
-      type: "owed",
-      person_name: dueData.person_name,
-      original_amount: Number(dueData.original_amount) || 0,
-      amount_paid: Number(dueData.amount_paid) || 0,
-      date: dueData.date || todayStr(),
-      due_date: dueData.due_date || null,
-      reason: dueData.reason || "",
-      status: status,
-      updated_at: new Date().toISOString()
-    };
-
-    const { error } = await supabase.from("dues").upsert([payload], { onConflict: "id" });
-    if (error) {
-      console.error("Supabase dues upsert error:", error);
-      alert("Cloud save error: " + error.message);
-    } else {
-      setDueModal(null);
-      fetchOnlineData();
-    }
-  };
-
-  const deleteDue = async (dueId) => {
-    if (!user) return;
-    if (confirm("Are you sure you want to delete this debt record from your Cloud account?")) {
-      const { error } = await supabase.from("dues").delete().eq("id", dueId).eq("user_id", user.id);
-      if (error) {
-        console.error("Supabase dues delete error:", error);
-        alert("Cloud delete error: " + error.message);
-      } else {
-        fetchOnlineData();
-      }
-    }
-  };
-
-  const logPaymentDue = async (due) => {
-    if (!user) return;
-    const remaining = Math.max(0, (Number(due.original_amount) || 0) - (Number(due.amount_paid) || 0));
-    const input = prompt(`Enter payment amount paid for ${due.person_name} (Remaining: ₹${remaining}):`, remaining);
-    if (input === null) return;
-    const amount = Number(input);
-    if (isNaN(amount) || amount <= 0) {
-      alert("Invalid payment amount.");
-      return;
-    }
-    const newPaid = (Number(due.amount_paid) || 0) + amount;
-    const isSettled = newPaid >= (Number(due.original_amount) || 0);
-
-    const { error } = await supabase
-      .from("dues")
-      .update({
-        amount_paid: newPaid,
-        status: isSettled ? "Paid" : "Pending",
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", due.id)
-      .eq("user_id", user.id);
-
-    if (error) {
-      alert("Error updating payment: " + error.message);
-    } else {
-      fetchOnlineData();
-    }
-  };
-
-  // --- LENDING EMI ACTIONS ---
-  const saveLendingModal = async (lendingData) => {
-    if (!user) {
-      alert("Please sign in with Google to save lending records to your account.");
-      return;
-    }
-
-    const lendingId = lendingData.id || crypto.randomUUID();
-    const principal = Number(lendingData.principal_amount) || 0;
-    const emiCount = Math.max(1, parseInt(lendingData.emi_count, 10) || 1);
-    const interestAmount = Number(lendingData.interest_amount) || 0;
-    const totalRepayment = principal + interestAmount;
-
-    const lendingPayload = {
-      id: lendingId,
-      user_id: user.id,
-      person_name: lendingData.person_name,
-      phone_number: normalizePhoneNumber(lendingData.phone_number),
-      whatsapp_number: normalizePhoneNumber(lendingData.whatsapp_number || lendingData.phone_number),
-      principal_amount: principal,
-      interest_enabled: !!lendingData.interest_enabled,
-      interest_type: lendingData.interest_type || "flat",
-      interest_rate: Number(lendingData.interest_rate) || 0,
-      interest_amount: interestAmount,
-      total_repayment: totalRepayment,
-      emi_enabled: true,
-      emi_count: emiCount,
-      start_date: lendingData.start_date || todayStr(),
-      first_due_date: lendingData.first_due_date || lendingData.start_date || todayStr(),
-      status: "Active",
-      notes: lendingData.notes || "",
-      updated_at: new Date().toISOString()
-    };
-
-    const { error: lendingErr } = await supabase.from("lending").upsert([lendingPayload], { onConflict: "id" });
-    if (lendingErr) {
-      console.error("Supabase lending save error:", lendingErr);
-      alert("Cloud save error: " + lendingErr.message);
-      return;
-    }
-
-    // Generate exact money-safe EMI schedule
-    const installments = calculateEmiInstallments(
-      principal,
-      emiCount,
-      lendingData.start_date || todayStr(),
-      lendingData.first_due_date || lendingData.start_date || todayStr()
-    );
-
-    // Delete existing installments if editing, then bulk insert generated installments
-    await supabase.from("lending_installments").delete().eq("lending_id", lendingId).eq("user_id", user.id);
-
-    const installmentPayloads = installments.map(inst => ({
-      id: crypto.randomUUID(),
-      user_id: user.id,
-      lending_id: lendingId,
-      installment_number: inst.installment_number,
-      due_date: inst.due_date,
-      amount: inst.amount,
-      paid_amount: 0,
-      status: "Pending",
-      updated_at: new Date().toISOString()
     }));
-
-    const { error: instErr } = await supabase.from("lending_installments").insert(installmentPayloads);
-    if (instErr) {
-      console.error("Supabase installment schedule creation error:", instErr);
-      alert("Schedule creation error: " + instErr.message);
-      return;
-    }
-
-    setLendingModal(null);
-    fetchOnlineData();
   };
 
-  const deleteLending = async (lendingId) => {
-    if (!user) return;
-    if (confirm("Are you sure you want to delete this lending record and its complete EMI schedule?")) {
-      const { error } = await supabase.from("lending").delete().eq("id", lendingId).eq("user_id", user.id);
-      if (error) {
-        console.error("Supabase lending delete error:", error);
-        alert("Delete error: " + error.message);
-      } else {
-        fetchOnlineData();
-      }
+  const deleteSideQuest = (sqId) => {
+    if (confirm("Are you sure you want to delete this Side Quest?")) {
+      setLocal(s => ({
+        ...s,
+        side_quests: (s.side_quests || []).filter(sq => sq.id !== sqId)
+      }));
     }
   };
 
-  const logEmiInstallmentPayment = async (installmentId, amountPaid, notes = "") => {
-    if (!user) {
-      alert("Please sign in to log payments.");
-      return;
-    }
-
-    const inst = (local.lending_installments || []).find(i => i.id === installmentId);
-    if (!inst) return;
-
-    const currentPaid = Number(inst.paid_amount) || 0;
-    const payAmt = Number(amountPaid) || 0;
-    if (payAmt <= 0) {
-      alert("Please enter a valid payment amount.");
-      return;
-    }
-
-    const newPaid = currentPaid + payAmt;
-    const totalInstAmount = Number(inst.amount) || 0;
-    const isPaid = newPaid >= totalInstAmount;
-    const newStatus = isPaid ? "Paid" : "Partially Paid";
-
-    // 1. Insert into lending_payments
-    const paymentPayload = {
-      id: crypto.randomUUID(),
-      user_id: user.id,
-      lending_id: inst.lending_id,
-      installment_id: inst.id,
-      amount: payAmt,
-      payment_date: todayStr(),
-      notes: notes,
-      updated_at: new Date().toISOString()
-    };
-
-    const { error: pErr } = await supabase.from("lending_payments").insert([paymentPayload]);
-    if (pErr) {
-      console.error("Payment insert error:", pErr);
-      alert("Payment log error: " + pErr.message);
-      return;
-    }
-
-    // 2. Update installment row
-    const { error: instErr } = await supabase.from("lending_installments").update({
-      paid_amount: newPaid,
-      status: newStatus,
-      paid_at: isPaid ? new Date().toISOString() : inst.paid_at,
-      updated_at: new Date().toISOString()
-    }).eq("id", inst.id).eq("user_id", user.id);
-
-    if (instErr) console.error("Installment update error:", instErr);
-
-    // 3. Check if all installments for this lending record are now Paid
-    const allInsts = (local.lending_installments || []).filter(i => i.lending_id === inst.lending_id);
-    const allCompleted = allInsts.every(i => (i.id === inst.id ? isPaid : i.status === "Paid"));
-    if (allCompleted) {
-      await supabase.from("lending").update({
-        status: "Completed",
-        updated_at: new Date().toISOString()
-      }).eq("id", inst.lending_id).eq("user_id", user.id);
-    }
-
-    setEmiPaymentModal(null);
-    fetchOnlineData();
-  };
-
-  const sendWhatsAppReminderAction = async (inst, lendingRec) => {
-    if (!lendingRec) return;
-    const friendName = lendingRec.person_name;
-    const rawPhone = lendingRec.whatsapp_number || lendingRec.phone_number;
-    const cleanPhone = normalizePhoneNumber(rawPhone);
-
-    const totalLent = Number(lendingRec.principal_amount) || 0;
-    const allInsts = (local.lending_installments || []).filter(i => i.lending_id === lendingRec.id);
-    const totalPaid = allInsts.reduce((sum, i) => sum + (Number(i.paid_amount) || 0), 0);
-    const remainingTotal = Math.max(0, totalLent - totalPaid);
-
-    const messageText = generateEmiReminderText({
-      friend_name: friendName,
-      emi_number: inst.installment_number,
-      total_emis: lendingRec.emi_count,
-      emi_amount: inst.amount,
-      due_date: inst.due_date,
-      remaining_amount: remainingTotal
-    });
-
-    try {
-      const session = (await supabase.auth.getSession())?.data?.session;
-      if (session) {
-        const response = await fetch("/api/send-whatsapp-reminder", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({
-            lending_id: lendingRec.id,
-            installment_id: inst.id,
-            reminder_type: "due_date",
-            friend_name: friendName,
-            whatsapp_number: cleanPhone,
-            emi_number: inst.installment_number,
-            emi_amount: inst.amount,
-            due_date: inst.due_date,
-            remaining_amount: remainingTotal
-          })
-        });
-
-        const resData = await response.json();
-        if (resData.success && resData.configured) {
-          alert(resData.already_sent ? "WhatsApp reminder was already sent for this installment!" : "WhatsApp reminder sent successfully via Meta Cloud API!");
-          fetchOnlineData();
-          return;
-        }
-      }
-    } catch (e) {
-      console.warn("API reminder dispatch warning, launching wa.me link:", e);
-    }
-
-    const waUrl = `https://wa.me/${cleanPhone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(messageText)}`;
-    window.open(waUrl, "_blank");
-  };
-
-  // --- PUSH NOTIFICATION REMINDERS FOR DUES (PRE-DUE DEADLINE - DEFAULT 10 MIN) ---
-  useEffect(() => {
-    if (notifPermission !== "granted") return;
-    if (!local.dues || local.dues.length === 0) return;
-
-    const checkDueReminders = () => {
-      const now = new Date();
-      const activeDues = local.dues || [];
-
-      activeDues.forEach(d => {
-        if (d.status === "Settled" || !d.due_date) return;
-
-        const dueTimeFormatted = d.due_time ? (d.due_time.length === 5 ? `${d.due_time}:00` : d.due_time) : "09:00:00";
-        const dueDateTimeStr = `${d.due_date}T${dueTimeFormatted}`;
-        const dueTimeMs = new Date(dueDateTimeStr).getTime();
-        if (isNaN(dueTimeMs)) return;
-
-        let leadMs = 10 * 60 * 1000; // Default 10 minutes pre-due
-        if (d.notify_lead === "15m") leadMs = 15 * 60 * 1000;
-        if (d.notify_lead === "1h") leadMs = 60 * 60 * 1000;
-        if (d.notify_lead === "1d") leadMs = 24 * 60 * 60 * 1000;
-        if (d.notify_lead === "none") return;
-
-        const triggerTimeMs = dueTimeMs - leadMs;
-        const diffMs = triggerTimeMs - now.getTime();
-
-        if (diffMs <= 0 && diffMs >= -120000) {
-          const storageKey = `due_notified_${d.id}_${d.due_date}_${d.due_time || ''}`;
-          if (!localStorage.getItem(storageKey)) {
-            localStorage.setItem(storageKey, "true");
-
-            const remaining = Math.max(0, (Number(d.original_amount) || 0) - (Number(d.amount_paid) || 0));
-            const title = d.is_emi
-              ? (d.type === "lent" ? `💸 EMI Lent Due in 10m: ${d.person_name}` : `💳 Debt EMI Due in 10m: ${d.person_name}`)
-              : (d.type === "lent" ? `💸 Money Lent Due in 10m: ${d.person_name}` : `💳 Debt Due in 10m: ${d.person_name}`);
-
-            const body = d.is_emi
-              ? `Installment ${(Number(d.emis_paid) || 0) + 1} of ${d.total_emis || '?'} (₹${d.emi_amount || remaining}) is due at ${d.due_time || d.due_date}.`
-              : `Remaining balance: ₹${remaining}. Due at ${d.due_time || d.due_date}. Open Ascend to log payment.`;
-
-            const options = {
-              body,
-              icon: "/icon-192.png",
-              badge: "/favicon-32.png",
-              tag: `due-reminder-${d.id}`,
-              renotify: true
-            };
-
-            if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-              navigator.serviceWorker.ready.then(reg => reg.showNotification(title, options));
-            } else if (typeof Notification !== "undefined") {
-              new Notification(title, options);
-            }
+  const recoverSideQuest = (sqId) => {
+    if (confirm("Recover this failed quest? You will earn 50% XP without altering past activity records.")) {
+      setLocal(s => ({
+        ...s,
+        side_quests: (s.side_quests || []).map(sq => {
+          if (sq.id === sqId) {
+            return { ...sq, completed: true, recovered: true, recovered_at: new Date().toISOString() };
           }
-        }
-      });
-    };
+          return sq;
+        })
+      }));
+    }
+  };
 
-    checkDueReminders();
-    const interval = setInterval(checkDueReminders, 20000);
-    return () => clearInterval(interval);
-  }, [local.dues, notifPermission]);
+  const updateDailyFocus = (goal) => {
+    const today = todayStr();
+    setLocal(s => ({
+      ...s,
+      daily_focus: {
+        ...(s.daily_focus || {}),
+        [today]: goal
+      }
+    }));
+  };
 
   // --- PUSH NOTIFICATION REMINDERS FOR SIDE QUESTS (10 MIN PRE-DUE) ---
   const requestNotificationPermission = async () => {
@@ -1480,25 +810,26 @@ function App() {
   }, [local.side_quests, notifPermission]);
 
   // --- QUICK LOG 10 PAGES READING ACTION ---
-  const logReadingTenPages = async () => {
-    if (!user) return;
-    const activeBook = (local.books || []).find(b => b.status === "Reading") || (local.books || [])[0];
+  const logReadingTenPages = () => {
+    const activeBook = local.books.find(b => b.status === "Reading") || local.books[0];
     if (activeBook) {
       const newPage = (activeBook.current_page || 0) + 10;
       const isComplete = activeBook.total_pages > 0 && newPage >= activeBook.total_pages;
-
-      const { error } = await supabase
-        .from("books")
-        .update({
-          current_page: newPage,
-          status: isComplete ? "Completed" : activeBook.status,
-          completed_date: isComplete ? todayStr() : activeBook.completed_date
-        })
-        .eq("id", activeBook.id)
-        .eq("user_id", user.id);
-
-      if (error) console.error("Cloud book reading log error:", error);
+      setLocal(s => ({
+        ...s,
+        books: s.books.map(b =>
+          b.id === activeBook.id
+            ? {
+                ...b,
+                current_page: newPage,
+                status: isComplete ? "Completed" : b.status,
+                completed_date: isComplete ? todayStr() : b.completed_date
+              }
+            : b
+        )
+      }));
     }
+    // Also toggle "Read 10 Pages" main quest if present
     const readQuest = activeTasks.find(t => t.title.toLowerCase().includes("read 10 pages"));
     if (readQuest) {
       const key = `${readQuest.id}:${todayStr()}`;
@@ -1506,41 +837,35 @@ function App() {
         toggleTaskCompletion(readQuest);
       }
     }
-    fetchOnlineData();
   };
 
   // --- CALCULATED STATS & ANALYTICS ---
   const todayCompletionsCount = useMemo(() => {
-    const completions = local.completions || {};
-    return activeTasks.filter(t => isTaskCompleted(t, todayStr(), completions)).length;
+    return activeTasks.filter(t => local.completions[`${t.id}:${todayStr()}`]).length;
   }, [activeTasks, local.completions]);
 
   const completionPct = activeTasks.length ? Math.round((todayCompletionsCount / activeTasks.length) * 100) : 0;
   
   const todayXp = useMemo(() => {
-    const completions = local.completions || {};
     return activeTasks
-      .filter(t => isTaskCompleted(t, todayStr(), completions))
-      .reduce((acc, t) => acc + ((t && t.xp) || 10), 0);
+      .filter(t => local.completions[`${t.id}:${todayStr()}`])
+      .reduce((acc, t) => acc + (t.xp || 10), 0);
   }, [activeTasks, local.completions]);
 
   // Level logic: level = floor(Total Cumulative XP / 100) + 1
   const totalXpAllTime = useMemo(() => {
     let total = 0;
-    const completions = local.completions || {};
-    const tasks = local.tasks || [];
-    Object.keys(completions).forEach(k => {
-      if (completions[k] && typeof k === "string" && !k.startsWith("title:")) {
+    Object.keys(local.completions).forEach(k => {
+      if (local.completions[k]) {
         const [taskId] = k.split(":");
-        const task = tasks.find(t => t && t.id === taskId);
+        const task = local.tasks.find(t => t.id === taskId);
         total += task ? (task.xp || 10) : 10;
       }
     });
-    // Side Quests XP (+10 Low, +20 Medium, +30 High, half XP if recovered)
+    // Side Quests XP (+10 Low, +20 Medium, +30 High)
     (local.side_quests || []).forEach(sq => {
-      if (sq && sq.completed) {
-        const base = sq.priority === "High" ? 30 : sq.priority === "Medium" ? 20 : 10;
-        const xp = sq.recovered ? Math.floor(base / 2) : base;
+      if (sq.completed) {
+        const xp = sq.priority === "High" ? 30 : sq.priority === "Medium" ? 20 : 10;
         total += xp;
       }
     });
@@ -1555,13 +880,11 @@ function App() {
     let currentStreak = 0;
     let maxStreak = 0;
     let checkDate = new Date();
-    const completions = local.completions || {};
     
-    // Check backwards day by day (capped at 365 days max)
-    let loopGuard = 0;
-    while (loopGuard++ < 365) {
+    // Check backwards day by day
+    while (true) {
       const dateKey = checkDate.toISOString().slice(0, 10);
-      const dayDone = activeTasks.some(t => isTaskCompleted(t, dateKey, completions));
+      const dayDone = activeTasks.some(t => local.completions[`${t.id}:${dateKey}`]);
       if (dayDone) {
         currentStreak++;
         checkDate.setDate(checkDate.getDate() - 1);
@@ -1570,7 +893,8 @@ function App() {
         if (dateKey === todayStr() && currentStreak === 0) {
           checkDate.setDate(checkDate.getDate() - 1);
           const yesterdayKey = checkDate.toISOString().slice(0, 10);
-          if (activeTasks.some(t => isTaskCompleted(t, yesterdayKey, completions))) {
+          if (activeTasks.some(t => local.completions[`${t.id}:${yesterdayKey}`])) {
+            // Continuation from yesterday
             continue;
           }
         }
@@ -1584,7 +908,7 @@ function App() {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const key = d.toISOString().slice(0, 10);
-      const dayDone = activeTasks.some(t => isTaskCompleted(t, key, completions));
+      const dayDone = activeTasks.some(t => local.completions[`${t.id}:${key}`]);
       if (dayDone) {
         tempStreak++;
         if (tempStreak > maxStreak) maxStreak = tempStreak;
@@ -1617,32 +941,14 @@ function App() {
         </div>
 
         <div className="headerRightGroup">
-          <div
-            className={`networkBadge ${syncStatus === "synced" ? "online" : syncStatus === "syncing" ? "syncing" : "offline"}`}
-            title="Realtime sync status with Supabase single source of truth"
-          >
-            {syncStatus === "synced" ? (
-              <Cloud size={14} />
-            ) : syncStatus === "syncing" ? (
-              <RefreshCw size={14} className="spin" />
-            ) : (
-              <WifiOff size={14} />
-            )}
-            <span>
-              {syncStatus === "synced"
-                ? "🟢 Realtime Synced"
-                : syncStatus === "syncing"
-                ? "🟡 Syncing Cloud..."
-                : "🔴 Sync Degraded"}
-            </span>
+          <div className={`networkBadge ${online ? "online" : "offline"}`}>
+            {online ? <Cloud size={14} /> : <WifiOff size={14} />}
+            <span>{online ? (syncing ? "Syncing..." : "Online Sync") : "Offline Vault"}</span>
           </div>
 
           {user ? (
             <div className="userBadge">
               <span className="userEmail">{user.email}</span>
-              <button className="iconBtn dangerHover" onClick={clearAllUserData} title="Reset Vault & Clear All Data Freshly 🧹">
-                <Trash2 size={16} color="#ef4444" />
-              </button>
               <button className="iconBtn dangerHover" onClick={handleLogout} title="Sign Out">
                 <LogOut size={16} />
               </button>
@@ -1663,13 +969,10 @@ function App() {
           { id: "quests", label: "Quests Center ⚔️", icon: <Swords size={16} /> },
           { id: "reading", label: "Reading Center", icon: <BookOpen size={16} /> },
           { id: "wishlist", label: "Wishlist", icon: <ShoppingCart size={16} /> },
-          { id: "dues", label: "Dues 💸", icon: <Wallet size={16} /> },
           { id: "analytics", label: "Analytics & Insights", icon: <BarChart2 size={16} /> },
           { id: "ai", label: "Ascend AI 🤖", icon: <Sparkles size={16} /> },
-          { id: "history", label: "Quest History 📜", icon: <CalendarDays size={16} /> },
           { id: "achievements", label: "Achievements 🏆", icon: <Trophy size={16} /> },
           { id: "ascension", label: "Ascension 🗺️", icon: <Target size={16} /> },
-          { id: "challenges", label: "Challenges 🎯", icon: <Shield size={16} /> },
           { id: "settings", label: "Settings", icon: <Settings size={16} /> }
         ].map(t => (
           <button
@@ -1682,38 +985,6 @@ function App() {
           </button>
         ))}
       </nav>
-
-      {missingTables.length > 0 && (
-        <div style={{
-          background: "rgba(239, 68, 68, 0.15)",
-          border: "1px solid #ef4444",
-          color: "#fca5a5",
-          padding: "12px 20px",
-          margin: "12px 20px 0 20px",
-          borderRadius: "10px",
-          fontSize: "13px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "12px"
-        }}>
-          <div>
-            <strong style={{ fontSize: "14px", color: "#f87171" }}>⚠️ Database Tables Missing in Remote Supabase Project!</strong>
-            <div style={{ marginTop: "4px", fontSize: "12px", color: "#cbd5e1" }}>
-              The following user tables do not exist yet on your live Supabase project (<code>vpfuiifncfzndkxstrwe.supabase.co</code>): <strong>{missingTables.join(", ")}</strong>.
-              <br />
-              Open your <a href="https://supabase.com/dashboard/project/vpfuiifncfzndkxstrwe/sql" target="_blank" rel="noreferrer" style={{ color: "#60a5fa", textDecoration: "underline", fontWeight: "600" }}>Supabase SQL Editor</a> and run the contents of <code>supabase.sql</code> to create tables & enable Realtime sync!
-            </div>
-          </div>
-          <button
-            onClick={() => fetchOnlineData()}
-            className="primaryBtn smallBtn"
-            style={{ whiteSpace: "nowrap", padding: "6px 14px", fontSize: "12px" }}
-          >
-            Retry Connection 🔄
-          </button>
-        </div>
-      )}
 
       {/* MAIN CONTAINER CONTENT */}
       {tab === "dashboard" && (
@@ -1757,31 +1028,6 @@ function App() {
           onDeleteSideQuest={deleteSideQuest}
           notifPermission={notifPermission}
           requestNotificationPermission={requestNotificationPermission}
-          onPurgeDuplicates={purgeDuplicateTasks}
-        />
-      )}
-
-      {tab === "dues" && (
-        <DuesView
-          dues={local.dues || []}
-          lending={local.lending || []}
-          lendingInstallments={local.lending_installments || []}
-          lendingPayments={local.lending_payments || []}
-          onOpenLendingModal={(data) => setLendingModal(data)}
-          onOpenLendingDetailModal={(lendingRec) => setLendingDetailModal({ lending: lendingRec })}
-          onOpenEmiPaymentModal={(inst, lendingRec) => setEmiPaymentModal({ installment: inst, lending: lendingRec })}
-          onDeleteLending={deleteLending}
-          onOpenDueModal={setDueModal}
-          onDeleteDue={deleteDue}
-          onLogPaymentDue={logPaymentDue}
-          onSendWhatsAppReminder={sendWhatsAppReminderAction}
-        />
-      )}
-
-      {tab === "history" && (
-        <HistoryView
-          local={local}
-          recoverSideQuest={recoverSideQuest}
         />
       )}
 
@@ -1801,13 +1047,6 @@ function App() {
         />
       )}
 
-      {tab === "challenges" && (
-        <ChallengesView
-          local={local}
-          setLocal={setLocal}
-        />
-      )}
-
       {tab === "ai" && (
         <AscendAiView
           local={local}
@@ -1823,20 +1062,18 @@ function App() {
 
       {tab === "reading" && (
         <ReadingView
-          user={user}
-          books={local.books || []}
+          books={local.books}
+          setLocal={setLocal}
           onOpenBookModal={setBookModal}
           logReadingTenPages={logReadingTenPages}
-          fetchOnlineData={fetchOnlineData}
         />
       )}
 
       {tab === "wishlist" && (
         <WishlistView
-          user={user}
-          wishlist={local.wishlist || []}
+          wishlist={local.wishlist}
+          setLocal={setLocal}
           onOpenWishlistModal={setWishlistModal}
-          fetchOnlineData={fetchOnlineData}
         />
       )}
 
@@ -1853,15 +1090,14 @@ function App() {
         <SettingsView
           user={user}
           online={online}
-          syncWithCloud={fetchOnlineData}
-          syncing={syncStatus === "syncing" || isFetchingOnline}
+          syncWithCloud={syncWithCloud}
+          syncing={syncing}
           notifPermission={notifPermission}
           requestNotificationPermission={requestNotificationPermission}
           geminiKey={geminiKey}
           setGeminiKey={setGeminiKey}
           handleGoogleLogin={handleGoogleLogin}
           handleLogout={handleLogout}
-          onClearAllData={clearAllUserData}
         />
       )}
 
@@ -1894,7 +1130,29 @@ function App() {
         <BookModal
           modalData={bookModal}
           onClose={() => setBookModal(null)}
-          onSave={saveBookModal}
+          onSave={(bookData) => {
+            if (bookData.isNew) {
+              const newBook = {
+                id: crypto.randomUUID(),
+                user_id: userId,
+                title: bookData.title,
+                author: bookData.author || "",
+                start_date: bookData.start_date || todayStr(),
+                completed_date: null,
+                current_page: parseInt(bookData.current_page, 10) || 0,
+                total_pages: parseInt(bookData.total_pages, 10) || 0,
+                status: bookData.status || "Reading",
+                notes: bookData.notes || ""
+              };
+              setLocal(s => ({ ...s, books: [...s.books, newBook] }));
+            } else {
+              setLocal(s => ({
+                ...s,
+                books: s.books.map(b => (b.id === bookData.id ? { ...b, ...bookData } : b))
+              }));
+            }
+            setBookModal(null);
+          }}
         />
       )}
 
@@ -1902,43 +1160,27 @@ function App() {
         <WishlistModal
           modalData={wishlistModal}
           onClose={() => setWishlistModal(null)}
-          onSave={saveWishlistModal}
-        />
-      )}
-
-      {dueModal && (
-        <DueModal
-          modalData={dueModal}
-          onClose={() => setDueModal(null)}
-          onSave={saveDueModal}
-        />
-      )}
-
-      {lendingModal && (
-        <LendingModal
-          modalData={lendingModal}
-          onClose={() => setLendingModal(null)}
-          onSave={saveLendingModal}
-        />
-      )}
-
-      {lendingDetailModal && (
-        <LendingDetailModal
-          lending={lendingDetailModal.lending}
-          installments={(local.lending_installments || []).filter(i => i.lending_id === lendingDetailModal.lending.id)}
-          payments={(local.lending_payments || []).filter(p => p.lending_id === lendingDetailModal.lending.id)}
-          onClose={() => setLendingDetailModal(null)}
-          onOpenEmiPaymentModal={(inst) => setEmiPaymentModal({ installment: inst, lending: lendingDetailModal.lending })}
-          onSendWhatsAppReminder={(inst) => sendWhatsAppReminderAction(inst, lendingDetailModal.lending)}
-        />
-      )}
-
-      {emiPaymentModal && (
-        <EmiPaymentModal
-          installment={emiPaymentModal.installment}
-          lending={emiPaymentModal.lending}
-          onClose={() => setEmiPaymentModal(null)}
-          onConfirm={(instId, amt, notes) => logEmiInstallmentPayment(instId, amt, notes)}
+          onSave={(itemData) => {
+            if (itemData.isNew) {
+              const newItem = {
+                id: crypto.randomUUID(),
+                user_id: userId,
+                item: itemData.item,
+                category: itemData.category || "General",
+                estimated_cost: parseFloat(itemData.estimated_cost) || 0,
+                priority: itemData.priority || "Medium",
+                purchased: false,
+                notes: itemData.notes || ""
+              };
+              setLocal(s => ({ ...s, wishlist: [...s.wishlist, newItem] }));
+            } else {
+              setLocal(s => ({
+                ...s,
+                wishlist: s.wishlist.map(w => (w.id === itemData.id ? { ...w, ...itemData } : w))
+              }));
+            }
+            setWishlistModal(null);
+          }}
         />
       )}
 
@@ -2143,7 +1385,7 @@ function DashboardView({
               <div className="emptyState">No active quests. Click "EDIT QUESTS" to add some!</div>
             ) : (
               tasks.map(task => {
-                const isDone = isTaskCompleted(task, todayStr(), local.completions);
+                const isDone = !!local.completions[`${task.id}:${todayStr()}`];
                 return (
                   <div key={task.id} className={`questItem ${isDone ? "completed" : ""}`}>
                     <button
@@ -2256,26 +1498,6 @@ function DashboardView({
 
         {/* SIDE PANELS COLUMN */}
         <div className="dashboardSideCol">
-          {/* CORE CONCEPTS ROTATION CARD */}
-          <div className="glassPanel">
-            <div className="panelHeader">
-              <div>
-                <h3>CORE CONCEPTS</h3>
-                <span className="panelSub">Daily focus topics</span>
-              </div>
-            </div>
-            <div className="conceptList">
-              {local.concepts.map(concept => (
-                <div key={concept.id} className="conceptItem">
-                  <div className="conceptDot"></div>
-                  <div className="conceptInfo">
-                    <strong>{concept.title}</strong>
-                    <small>{concept.subtitle}</small>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* QUICK READING LOG CARD */}
           <div className="glassPanel">
@@ -2720,7 +1942,7 @@ function AscendAiView({
 // ==========================================
 function EditQuestsView({
   tasks, concepts, toggleLock, moveOrder, onOpenQuestModal, onDeleteQuest,
-  onOpenConceptModal, onDeleteConcept, onPurgeDuplicates
+  onOpenConceptModal, onDeleteConcept
 }) {
   return (
     <div className="fade-in">
@@ -2734,18 +1956,10 @@ function EditQuestsView({
             <strong>Note: Daily completion checkboxes are strictly on the Dashboard.</strong>
           </p>
         </div>
-        <div className="headerBtnGroup">
-          {onPurgeDuplicates && (
-            <button className="secondaryBtn" onClick={onPurgeDuplicates} title="Purge all duplicate quests by title from your cloud database">
-              <RefreshCw size={14} />
-              <span>Purge Duplicates 🧹</span>
-            </button>
-          )}
-          <button className="primaryBtn" onClick={() => onOpenQuestModal({ isNew: true })}>
-            <Plus size={16} />
-            <span>Add New Quest</span>
-          </button>
-        </div>
+        <button className="primaryBtn" onClick={() => onOpenQuestModal({ isNew: true })}>
+          <Plus size={16} />
+          <span>Add New Quest</span>
+        </button>
       </div>
 
       {/* QUESTS MANAGEMENT LIST */}
@@ -2873,7 +2087,7 @@ function QuestsSection({
   subTab, setSubTab, tasks, concepts, toggleLock, moveOrder, onOpenQuestModal,
   onDeleteQuest, onOpenConceptModal, onDeleteConcept, sideQuests,
   toggleSideQuestCompletion, onOpenSideQuestModal, onDeleteSideQuest,
-  notifPermission, requestNotificationPermission, onPurgeDuplicates
+  notifPermission, requestNotificationPermission
 }) {
   const todayPendingSideCount = useMemo(() => {
     return (sideQuests || []).filter(sq => sq.date === todayStr() && !sq.completed).length;
@@ -2930,7 +2144,6 @@ function QuestsSection({
           onDeleteQuest={onDeleteQuest}
           onOpenConceptModal={onOpenConceptModal}
           onDeleteConcept={onDeleteConcept}
-          onPurgeDuplicates={onPurgeDuplicates}
         />
       ) : (
         <SideQuestView
@@ -3296,36 +2509,31 @@ function SideQuestModal({ modalData, onClose, onSave }) {
 // ==========================================
 // 3. READING COMMAND CENTER COMPONENT
 // ==========================================
-function ReadingView({ user, books, onOpenBookModal, logReadingTenPages, fetchOnlineData }) {
+function ReadingView({ books, setLocal, onOpenBookModal, logReadingTenPages }) {
   const activeBook = books.find(b => b.status === "Reading") || books[0];
 
-  const handlePageChange = async (bookId, newPage) => {
-    if (!user) return;
+  const handlePageChange = (bookId, newPage) => {
     const val = Math.max(0, parseInt(newPage, 10) || 0);
-    const targetBook = (books || []).find(b => b.id === bookId);
-    if (!targetBook) return;
-    const isFinished = targetBook.total_pages > 0 && val >= targetBook.total_pages;
-
-    const { error } = await supabase
-      .from("books")
-      .update({
-        current_page: val,
-        status: isFinished ? "Completed" : targetBook.status,
-        completed_date: isFinished ? todayStr() : targetBook.completed_date
+    setLocal(s => ({
+      ...s,
+      books: s.books.map(b => {
+        if (b.id === bookId) {
+          const isFinished = b.total_pages > 0 && val >= b.total_pages;
+          return {
+            ...b,
+            current_page: val,
+            status: isFinished ? "Completed" : b.status,
+            completed_date: isFinished ? todayStr() : b.completed_date
+          };
+        }
+        return b;
       })
-      .eq("id", bookId)
-      .eq("user_id", user.id);
-
-    if (error) console.error("Cloud book page update error:", error);
-    fetchOnlineData();
+    }));
   };
 
-  const deleteBook = async (bookId) => {
-    if (!user) return;
-    if (confirm("Remove this book from your cloud library?")) {
-      const { error } = await supabase.from("books").delete().eq("id", bookId).eq("user_id", user.id);
-      if (error) console.error("Cloud book delete error:", error);
-      fetchOnlineData();
+  const deleteBook = (bookId) => {
+    if (confirm("Remove this book from your library?")) {
+      setLocal(s => ({ ...s, books: s.books.filter(b => b.id !== bookId) }));
     }
   };
 
@@ -3417,29 +2625,19 @@ function ReadingView({ user, books, onOpenBookModal, logReadingTenPages, fetchOn
 // ==========================================
 // 4. WISHLIST ("THINGS TO BUY") COMPONENT
 // ==========================================
-function WishlistView({ user, wishlist, onOpenWishlistModal, fetchOnlineData }) {
+function WishlistView({ wishlist, setLocal, onOpenWishlistModal }) {
   const [filter, setFilter] = useState("all"); // 'all' | 'active' | 'purchased'
 
-  const togglePurchased = async (id) => {
-    if (!user) return;
-    const item = (wishlist || []).find(w => w.id === id);
-    if (!item) return;
-    const { error } = await supabase
-      .from("wishlist")
-      .update({ purchased: !item.purchased })
-      .eq("id", id)
-      .eq("user_id", user.id);
-
-    if (error) console.error("Cloud wishlist toggle error:", error);
-    fetchOnlineData();
+  const togglePurchased = (id) => {
+    setLocal(s => ({
+      ...s,
+      wishlist: s.wishlist.map(w => (w.id === id ? { ...w, purchased: !w.purchased } : w))
+    }));
   };
 
-  const deleteWishItem = async (id) => {
-    if (!user) return;
-    if (confirm("Remove item from your cloud wishlist?")) {
-      const { error } = await supabase.from("wishlist").delete().eq("id", id).eq("user_id", user.id);
-      if (error) console.error("Cloud wishlist delete error:", error);
-      fetchOnlineData();
+  const deleteWishItem = (id) => {
+    if (confirm("Remove item from wishlist?")) {
+      setLocal(s => ({ ...s, wishlist: s.wishlist.filter(w => w.id !== id) }));
     }
   };
 
@@ -4054,22 +3252,29 @@ function AchievementsView({ local, streakStats, totalXpAllTime, currentLevel }) 
 // ==========================================
 function AscensionJourneyView({ currentLevel, totalXpAllTime }) {
   const ranks = [
-    { level: 1, title: "🌱 Novice Ascendant", desc: "Beginning of your RPG journey", minXp: 0 },
-    { level: 2, title: "⚔️ Disciplined Seeker", desc: "Building consistent daily routines", minXp: 100 },
-    { level: 4, title: "🔥 Consistent Adventurer", desc: "Sustaining 7+ day streaks", minXp: 300 },
-    { level: 6, title: "🧠 Knowledge Builder", desc: "Mastering core concepts & reading focus", minXp: 500 },
-    { level: 8, title: "💻 Data Warrior", desc: "Executing high priority technical quests", minXp: 700 },
-    { level: 10, title: "⚡ Technical Champion", desc: "Overcoming major multi-day challenges", minXp: 900 },
-    { level: 15, title: "🚀 Grand Ascended Master", desc: "Pinnacle of personal ascendance", minXp: 1400 }
+    { level: 1, title: "🥉 Bronze III", desc: "Beginning of your Ascension League journey", minXp: 0 },
+    { level: 2, title: "🥉 Bronze II", desc: "Building basic daily consistency", minXp: 100 },
+    { level: 3, title: "🥉 Bronze I", desc: "Solidifying foundational habits", minXp: 200 },
+    { level: 4, title: "🥈 Silver III", desc: "Sustaining regular streak progress", minXp: 300 },
+    { level: 5, title: "🥈 Silver II", desc: "Expanding daily productivity output", minXp: 400 },
+    { level: 6, title: "🥈 Silver I", desc: "Mastering routine execution", minXp: 500 },
+    { level: 7, title: "🥇 Gold III", desc: "Entering high productivity tier", minXp: 600 },
+    { level: 8, title: "🥇 Gold II", desc: "Consistent high-performing ascendant", minXp: 700 },
+    { level: 9, title: "🥇 Gold I", desc: "Top tier Gold League execution", minXp: 800 },
+    { level: 10, title: "💎 Crystal League", desc: "Crystal clear focus and discipline", minXp: 900 },
+    { level: 12, title: "🔮 Master League", desc: "Mastery over daily goals and focus", minXp: 1100 },
+    { level: 15, title: "🏆 Champion League", desc: "Elite performance & top rank status", minXp: 1400 },
+    { level: 20, title: "⚡ Titan League", desc: "Unstoppable titan of productivity", minXp: 1900 },
+    { level: 25, title: "👑 Legend League", desc: "Pinnacle of Clash Ascension Legends", minXp: 2500 }
   ];
 
   return (
     <main className="viewContainer fade-in">
       <div className="pageHeaderRow">
         <div>
-          <div className="eyebrowText"><Target size={13} /> LONG-TERM CHARACTER GROWTH</div>
-          <h2 className="pageTitle">ASCENSION JOURNEY</h2>
-          <p className="pageSubtitle">Your RPG evolution tree from Novice Ascendant to Grand Ascended Master.</p>
+          <div className="eyebrowText"><Target size={13} /> LEAGUE RANKING SYSTEM</div>
+          <h2 className="pageTitle">ASCENSION LEAGUES</h2>
+          <p className="pageSubtitle">Clash of Clans inspired rank progression from Bronze III to Legend League.</p>
         </div>
       </div>
 
@@ -4083,7 +3288,7 @@ function AscensionJourneyView({ currentLevel, totalXpAllTime }) {
                 <div className="stepRankTitle">{r.title}</div>
                 <div className="stepLevelTag">Level {r.level}+ ({r.minXp} Total XP)</div>
                 <p className="stepDesc">{r.desc}</p>
-                {isCurrent && <div className="currentBadge">CURRENT RANK</div>}
+                {isCurrent && <div className="currentBadge">CURRENT LEAGUE</div>}
               </div>
               {i < ranks.length - 1 && <div className={`journeyConnector ${isReached ? "reached" : ""}`}>↓</div>}
             </React.Fragment>
@@ -4142,7 +3347,7 @@ function ChallengesView({ local, setLocal }) {
 // ==========================================
 // 6. SETTINGS VIEW COMPONENT
 // ==========================================
-function SettingsView({ user, online, syncWithCloud, syncing, notifPermission, requestNotificationPermission, geminiKey, setGeminiKey, handleGoogleLogin, handleLogout, onClearAllData }) {
+function SettingsView({ user, online, syncWithCloud, syncing, notifPermission, requestNotificationPermission, geminiKey, setGeminiKey, handleGoogleLogin, handleLogout }) {
   return (
     <main className="viewContainer fade-in">
       <div className="pageHeaderRow">
@@ -4234,22 +3439,11 @@ function SettingsView({ user, online, syncWithCloud, syncing, notifPermission, r
         </p>
       </div>
 
-      <div className="glassPanel marginTop" style={{ border: "1px solid rgba(239, 68, 68, 0.4)", background: "rgba(239, 68, 68, 0.05)" }}>
-        <h3 style={{ color: "#f87171" }}>🚨 Danger Zone: Reset Account & Clear All Data</h3>
+      <div className="glassPanel marginTop">
+        <h3>Offline & PWA Configuration</h3>
         <p className="settingsDesc">
-          Permanently delete all saved quests, history, completion records, reading books, wishlist items, dues, and lending data from your cloud account and start fresh with default starter quests.
+          Project Ascend uses IndexedDB as its primary database. The web app functions 100% offline, caching app shell assets via Service Worker. When internet reconnects, state automatically syncs to your Supabase PostgreSQL cloud tables.
         </p>
-
-        <div className="settingsActions" style={{ marginTop: 14 }}>
-          <button
-            className="secondaryBtn"
-            onClick={onClearAllData}
-            style={{ background: "rgba(239, 68, 68, 0.15)", borderColor: "#ef4444", color: "#fca5a5" }}
-          >
-            <Trash2 size={16} />
-            <span>Reset Vault & Clear All Data Freshly 🧹</span>
-          </button>
-        </div>
       </div>
     </main>
   );
@@ -4513,1049 +3707,5 @@ function WishlistModal({ modalData, onClose, onSave }) {
   );
 }
 
-function DuesView({
-  dues,
-  lending,
-  lendingInstallments,
-  lendingPayments,
-  onOpenLendingModal,
-  onOpenLendingDetailModal,
-  onOpenEmiPaymentModal,
-  onDeleteLending,
-  onOpenDueModal,
-  onDeleteDue,
-  onLogPaymentDue,
-  onSendWhatsAppReminder
-}) {
-  const [subTab, setSubTab] = useState("lending"); // "lending" | "debts"
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterTag, setFilterTag] = useState("all"); // "all" | "active" | "completed" | "overdue"
-
-  const today = todayStr();
-
-  // Lending Aggregates
-  const totalLentAmount = useMemo(() => {
-    return (lending || []).reduce((sum, l) => sum + (Number(l.principal_amount) || 0), 0);
-  }, [lending]);
-
-  const totalLendingPaymentsReceived = useMemo(() => {
-    return (lendingPayments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-  }, [lendingPayments]);
-
-  const totalOutstanding = Math.max(0, totalLentAmount - totalLendingPaymentsReceived);
-
-  const activeLendingCount = useMemo(() => {
-    return (lending || []).filter(l => l.status === "Active").length;
-  }, [lending]);
-
-  const overdueAmount = useMemo(() => {
-    return (lendingInstallments || []).reduce((sum, inst) => {
-      const status = deriveInstallmentStatus(inst, today);
-      if (status === "Overdue") {
-        const remainingInst = Math.max(0, (Number(inst.amount) || 0) - (Number(inst.paid_amount) || 0));
-        return sum + remainingInst;
-      }
-      return sum;
-    }, 0);
-  }, [lendingInstallments, today]);
-
-  const nextUpcomingEmi = useMemo(() => {
-    const unpaid = (lendingInstallments || [])
-      .filter(inst => {
-        const st = deriveInstallmentStatus(inst, today);
-        return st === "Pending" || st === "Partially Paid" || st === "Overdue";
-      })
-      .sort((a, b) => (a.due_date || "").localeCompare(b.due_date || ""))[0];
-
-    return unpaid || null;
-  }, [lendingInstallments, today]);
-
-  // Debts Aggregates
-  const debtsList = useMemo(() => Array.isArray(dues) ? dues : [], [dues]);
-  const totalDebtsAmount = useMemo(() => {
-    return debtsList.reduce((sum, d) => sum + (Number(d.original_amount) || 0), 0);
-  }, [debtsList]);
-
-  const totalDebtsPaid = useMemo(() => {
-    return debtsList.reduce((sum, d) => sum + (Number(d.amount_paid) || 0), 0);
-  }, [debtsList]);
-
-  const totalDebtsOutstanding = Math.max(0, totalDebtsAmount - totalDebtsPaid);
-
-  // Filtered Lending items
-  const filteredLending = useMemo(() => {
-    return (lending || []).filter(l => {
-      const matchesSearch = (l.person_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            (l.phone_number || "").includes(searchQuery);
-
-      if (!matchesSearch) return false;
-
-      const insts = (lendingInstallments || []).filter(i => i.lending_id === l.id);
-      const isOverdue = insts.some(i => deriveInstallmentStatus(i, today) === "Overdue");
-
-      if (filterTag === "active") return l.status === "Active";
-      if (filterTag === "completed") return l.status === "Completed";
-      if (filterTag === "overdue") return isOverdue;
-      return true;
-    });
-  }, [lending, lendingInstallments, searchQuery, filterTag, today]);
-
-  return (
-    <div className="viewContainer fade-in">
-      <div className="pageHeaderRow">
-        <div>
-          <div className="eyebrowText">
-            <Wallet size={13} /> FINANCIAL COMMAND CENTER
-          </div>
-          <h2 className="pageTitle">DUES & EMI TRACKER 💸</h2>
-          <p className="pageSubtitle">
-            Separate receivables from liabilities. Manage money lent with automated EMI schedules and track debts owed in real-time online.
-          </p>
-        </div>
-
-        <div className="headerBtnGroup">
-          <button className="primaryBtn" onClick={() => onOpenLendingModal({ isNew: true })}>
-            <Plus size={16} />
-            <span>+ Add Lending</span>
-          </button>
-          <button className="secondaryBtn" onClick={() => onOpenDueModal({ isNew: true, defaultType: "owed" })}>
-            <Plus size={16} />
-            <span>+ Add Debt</span>
-          </button>
-        </div>
-      </div>
-
-      {/* SUB-TABS SELECTOR */}
-      <div className="subTabNavRow">
-        <button
-          className={`subTabNavBtn ${subTab === "lending" ? "active" : ""}`}
-          onClick={() => setSubTab("lending")}
-        >
-          <ArrowUpRight size={16} style={{ color: "#10b981" }} />
-          <span>Lending (Money Lent)</span>
-          <span className="statusCountTag" style={{ marginLeft: 6, background: "rgba(16, 185, 129, 0.15)", color: "#10b981" }}>
-            {activeLendingCount} Active
-          </span>
-        </button>
-
-        <button
-          className={`subTabNavBtn ${subTab === "debts" ? "active" : ""}`}
-          onClick={() => setSubTab("debts")}
-        >
-          <ArrowDownLeft size={16} style={{ color: "#ef4444" }} />
-          <span>Debts (Money Owed)</span>
-          <span className="statusCountTag" style={{ marginLeft: 6, background: "rgba(239, 68, 68, 0.15)", color: "#ef4444" }}>
-            {debtsList.filter(d => d.status !== "Paid").length} Active
-          </span>
-        </button>
-      </div>
-
-      {/* LENDING SUB-TAB CONTENT */}
-      {subTab === "lending" && (
-        <>
-          {/* LENDING METRICS GRID */}
-          <div className="metricsGrid">
-            <div className="metricCard">
-              <div className="metricIcon gold"><ArrowUpRight size={22} style={{ color: "#10b981" }} /></div>
-              <div className="metricData">
-                <strong style={{ color: "#10b981" }}>₹{totalLentAmount.toLocaleString('en-IN')}</strong>
-                <small>Total Principal Lent</small>
-              </div>
-            </div>
-
-            <div className="metricCard">
-              <div className="metricIcon star"><CheckCircle2 size={22} style={{ color: "#3b82f6" }} /></div>
-              <div className="metricData">
-                <strong style={{ color: "#3b82f6" }}>₹{totalLendingPaymentsReceived.toLocaleString('en-IN')}</strong>
-                <small>Total Received</small>
-              </div>
-            </div>
-
-            <div className="metricCard">
-              <div className="metricIcon flame"><Wallet size={22} style={{ color: "#f5b942" }} /></div>
-              <div className="metricData">
-                <strong style={{ color: "#f5b942" }}>₹{totalOutstanding.toLocaleString('en-IN')}</strong>
-                <small>Total Outstanding ({activeLendingCount} Active)</small>
-              </div>
-            </div>
-
-            <div className="metricCard">
-              <div className="metricIcon book"><Clock size={22} style={{ color: overdueAmount > 0 ? "#ef4444" : "#a0aec0" }} /></div>
-              <div className="metricData">
-                <strong style={{ color: overdueAmount > 0 ? "#ef4444" : "#e2e8f0" }}>
-                  {overdueAmount > 0 ? `₹${overdueAmount.toLocaleString('en-IN')} Overdue` : "0 Overdue"}
-                </strong>
-                <small>{nextUpcomingEmi ? `Next EMI due: ${nextUpcomingEmi.due_date}` : "No upcoming EMIs"}</small>
-              </div>
-            </div>
-          </div>
-
-          {/* FILTER & SEARCH BAR */}
-          <div className="lendingFilterBar marginTop">
-            <input
-              type="text"
-              className="searchInput"
-              placeholder="🔍 Search by person name or phone..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-
-            <div className="filterBtnGroup">
-              {[
-                { id: "all", label: "All Records" },
-                { id: "active", label: "Active" },
-                { id: "overdue", label: "⚠️ Overdue" },
-                { id: "completed", label: "✓ Completed" }
-              ].map(f => (
-                <button
-                  key={f.id}
-                  className={`filterTagBtn ${filterTag === f.id ? "active" : ""}`}
-                  onClick={() => setFilterTag(f.id)}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* LENDING LIST */}
-          {filteredLending.length === 0 ? (
-            <div className="glassPanel emptyState" style={{ padding: "40px", textAlign: "center" }}>
-              <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>
-                No lending records match your filter criteria. Click "+ Add Lending" to create a new EMI lending record!
-              </p>
-            </div>
-          ) : (
-            <div className="questList">
-              {filteredLending.map(l => (
-                <LendingCard
-                  key={l.id}
-                  lending={l}
-                  installments={(lendingInstallments || []).filter(i => i.lending_id === l.id)}
-                  today={today}
-                  onOpenDetail={onOpenLendingDetailModal}
-                  onOpenPaymentModal={onOpenEmiPaymentModal}
-                  onSendWhatsApp={onSendWhatsAppReminder}
-                  onEdit={(rec) => onOpenLendingModal({ isNew: false, lending: rec })}
-                  onDelete={onDeleteLending}
-                />
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* DEBTS SUB-TAB CONTENT */}
-      {subTab === "debts" && (
-        <>
-          <div className="metricsGrid">
-            <div className="metricCard">
-              <div className="metricIcon flame"><ArrowDownLeft size={22} style={{ color: "#ef4444" }} /></div>
-              <div className="metricData">
-                <strong style={{ color: "#ef4444" }}>₹{totalDebtsAmount.toLocaleString('en-IN')}</strong>
-                <small>Total Principal Debts</small>
-              </div>
-            </div>
-
-            <div className="metricCard">
-              <div className="metricIcon star"><CheckCircle2 size={22} style={{ color: "#10b981" }} /></div>
-              <div className="metricData">
-                <strong style={{ color: "#10b981" }}>₹{totalDebtsPaid.toLocaleString('en-IN')}</strong>
-                <small>Total Debts Paid</small>
-              </div>
-            </div>
-
-            <div className="metricCard">
-              <div className="metricIcon gold"><Wallet size={22} style={{ color: "#f56565" }} /></div>
-              <div className="metricData">
-                <strong style={{ color: "#f56565" }}>₹{totalDebtsOutstanding.toLocaleString('en-IN')}</strong>
-                <small>Outstanding Liabilities</small>
-              </div>
-            </div>
-          </div>
-
-          <div className="glassPanel marginTop">
-            <div className="panelHeader">
-              <div>
-                <h3>💳 DEBTS (MONEY I OWE)</h3>
-                <span className="panelSub">Payable to creditors ({debtsList.filter(d => d.status !== "Paid").length} Active)</span>
-              </div>
-              <button className="secondaryBtn smallBtn" onClick={() => onOpenDueModal({ isNew: true, defaultType: "owed" })}>
-                <Plus size={14} />
-                <span>+ Add Debt</span>
-              </button>
-            </div>
-
-            {debtsList.length === 0 ? (
-              <div className="emptyState" style={{ padding: "32px 16px", textAlign: "center" }}>
-                No debt records logged. Click "+ Add Debt" to track money owed to others.
-              </div>
-            ) : (
-              <div className="questList">
-                {debtsList.map(d => (
-                  <DueQuestCard
-                    key={d.id}
-                    due={d}
-                    today={today}
-                    type="owed"
-                    onLogPayment={onLogPaymentDue}
-                    onDelete={onDeleteDue}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function LendingCard({ lending, installments, today, onOpenDetail, onOpenPaymentModal, onSendWhatsApp, onEdit, onDelete }) {
-  const principal = Number(lending.principal_amount) || 0;
-  const totalPaid = installments.reduce((sum, i) => sum + (Number(i.paid_amount) || 0), 0);
-  const remaining = Math.max(0, principal - totalPaid);
-  const pct = principal > 0 ? Math.min(100, Math.round((totalPaid / principal) * 100)) : 0;
-
-  const paidCount = installments.filter(i => deriveInstallmentStatus(i, today) === "Paid").length;
-  const totalCount = installments.length || lending.emi_count || 1;
-
-  const nextUnpaidInst = installments
-    .filter(i => deriveInstallmentStatus(i, today) !== "Paid")
-    .sort((a, b) => (a.due_date || "").localeCompare(b.due_date || ""))[0];
-
-  const hasOverdue = installments.some(i => deriveInstallmentStatus(i, today) === "Overdue");
-  const isCompleted = lending.status === "Completed" || remaining === 0;
-
-  const emiAmount = installments[0] ? Number(installments[0].amount) : Math.round(principal / totalCount);
-
-  return (
-    <div className={`questItem ${isCompleted ? "completed" : ""}`} style={{ flexDirection: "column", alignItems: "stretch", gap: 12, padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <div className="questContent" style={{ flex: 1 }}>
-          <div className="questTitleRow">
-            <strong className="questTitle" style={{ fontSize: "16px" }}>{lending.person_name}</strong>
-            {lending.phone_number && <span className="catTag" style={{ background: "rgba(255,255,255,0.06)", color: "#a0aec0" }}>📱 {lending.phone_number}</span>}
-            {isCompleted && <span className="badgeStatus paid">✓ Completed</span>}
-            {hasOverdue && !isCompleted && <span className="badgeStatus overdue">⚠️ Overdue</span>}
-            {!isCompleted && !hasOverdue && <span className="badgeStatus pending">Active</span>}
-          </div>
-
-          <div className="questMeta" style={{ flexWrap: "wrap", gap: 10, marginTop: 6 }}>
-            <span className="targetTag" style={{ color: "#3b82f6", fontWeight: 700 }}>
-              🔄 EMI: ₹{emiAmount.toLocaleString('en-IN')}/mo ({lending.emi_count} months)
-            </span>
-            <span className="targetTag">
-              Progress: {paidCount}/{totalCount} paid
-            </span>
-            {nextUnpaidInst && (
-              <span className="targetTag" style={{ color: hasOverdue ? "#ef4444" : "#f5b942", fontWeight: 700 }}>
-                <Clock size={12} /> Next Due: {nextUnpaidInst.due_date} (₹{Number(nextUnpaidInst.amount).toLocaleString('en-IN')})
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="questRight" style={{ flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-          <strong style={{ fontSize: "18px", color: "#10b981" }}>
-            +₹{remaining.toLocaleString('en-IN')}
-          </strong>
-          <small style={{ fontSize: "11px", color: "#8b96a8" }}>
-            ₹{totalPaid.toLocaleString('en-IN')} paid of ₹{principal.toLocaleString('en-IN')}
-          </small>
-        </div>
-      </div>
-
-      {/* PROGRESS BAR */}
-      <div className="levelBarContainer" style={{ height: 5, borderRadius: 3, background: "#1e2638" }}>
-        <div className="levelBarFill" style={{ width: `${pct}%`, background: isCompleted ? "#10b981" : hasOverdue ? "#ef4444" : "#3b82f6" }}></div>
-      </div>
-
-      {/* CARD ACTIONS */}
-      <div className="questTitleRow" style={{ justifyContent: "space-between", marginTop: 4 }}>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="primaryBtn smallBtn" onClick={() => onOpenDetail(lending)} style={{ padding: "5px 12px", fontSize: "12px" }}>
-            View EMI Schedule 📋
-          </button>
-
-          {!isCompleted && nextUnpaidInst && (
-            <button className="secondaryBtn smallBtn" onClick={() => onOpenPaymentModal(nextUnpaidInst, lending)} style={{ padding: "5px 10px", fontSize: "12px" }}>
-              + Log Payment
-            </button>
-          )}
-
-          {!isCompleted && nextUnpaidInst && (
-            <button className="whatsappBtn" onClick={() => onSendWhatsApp(nextUnpaidInst, lending)}>
-              WhatsApp Reminder 📲
-            </button>
-          )}
-        </div>
-
-        <div style={{ display: "flex", gap: 4 }}>
-          <button className="iconBtn small" onClick={() => onEdit(lending)} title="Edit Lending">
-            <Pencil size={13} />
-          </button>
-          <button className="iconBtn small dangerHover" onClick={() => onDelete(lending.id)} title="Delete Lending">
-            <Trash2 size={13} />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LendingModal({ modalData, onClose, onSave }) {
-  const lending = modalData.lending || {};
-  const [personName, setPersonName] = useState(lending.person_name || "");
-  const [phoneNumber, setPhoneNumber] = useState(lending.phone_number || "");
-  const [whatsappNumber, setWhatsappNumber] = useState(lending.whatsapp_number || lending.phone_number || "");
-  const [principalAmount, setPrincipalAmount] = useState(lending.principal_amount || "");
-  
-  const [durationPreset, setDurationPreset] = useState(() => {
-    const count = lending.emi_count;
-    if ([1, 2, 3, 6, 9, 12].includes(count)) return String(count);
-    if (count > 0) return "custom";
-    return "3";
-  });
-  const [customDuration, setCustomDuration] = useState(lending.emi_count || 3);
-
-  const [startDate, setStartDate] = useState(lending.start_date || todayStr());
-  
-  const defaultFirstDueDate = useMemo(() => {
-    const d = new Date((lending.start_date || todayStr()) + "T00:00:00");
-    d.setMonth(d.getMonth() + 1);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  }, [lending.start_date]);
-
-  const [firstDueDate, setFirstDueDate] = useState(lending.first_due_date || defaultFirstDueDate);
-  const [notes, setNotes] = useState(lending.notes || "");
-
-  const [interestEnabled, setInterestEnabled] = useState(!!lending.interest_enabled);
-  const [interestRate, setInterestRate] = useState(lending.interest_rate || 0);
-
-  const emiCount = durationPreset === "custom" ? Math.max(1, parseInt(customDuration, 10) || 1) : parseInt(durationPreset, 10);
-
-  const liveInstallments = useMemo(() => {
-    if (!principalAmount || Number(principalAmount) <= 0) return [];
-    return calculateEmiInstallments(principalAmount, emiCount, startDate, firstDueDate);
-  }, [principalAmount, emiCount, startDate, firstDueDate]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!personName.trim() || !principalAmount || Number(principalAmount) <= 0) {
-      alert("Please enter borrower name and a positive lent amount.");
-      return;
-    }
-
-    onSave({
-      id: lending.id,
-      person_name: personName.trim(),
-      phone_number: phoneNumber.trim(),
-      whatsapp_number: whatsappNumber.trim() || phoneNumber.trim(),
-      principal_amount: Number(principalAmount),
-      interest_enabled: interestEnabled,
-      interest_rate: interestEnabled ? Number(interestRate) : 0,
-      interest_amount: interestEnabled ? Math.round(Number(principalAmount) * (Number(interestRate) / 100)) : 0,
-      emi_count: emiCount,
-      start_date: startDate,
-      first_due_date: firstDueDate,
-      notes: notes.trim()
-    });
-  };
-
-  return (
-    <div className="modalBackdrop fade-in">
-      <div className="modalCard glassPanel" style={{ maxWidth: "580px" }}>
-        <div className="modalHeader">
-          <h3>{modalData.isNew ? "💸 Add New Lending Record" : "✏️ Edit Lending Record"}</h3>
-          <button className="iconBtn small" onClick={onClose}><X size={16} /></button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="modalForm">
-          <div className="formGroup">
-            <label>Borrower / Friend Name *</label>
-            <input
-              type="text"
-              required
-              value={personName}
-              onChange={e => setPersonName(e.target.value)}
-              placeholder="e.g. Arun, Priya, Rahul..."
-            />
-          </div>
-
-          <div className="formRowGrid">
-            <div className="formGroup">
-              <label>Phone Number</label>
-              <input
-                type="tel"
-                value={phoneNumber}
-                onChange={e => {
-                  setPhoneNumber(e.target.value);
-                  if (!whatsappNumber) setWhatsappNumber(e.target.value);
-                }}
-                placeholder="+919876543210"
-              />
-            </div>
-            <div className="formGroup">
-              <label>WhatsApp Number</label>
-              <input
-                type="tel"
-                value={whatsappNumber}
-                onChange={e => setWhatsappNumber(e.target.value)}
-                placeholder="+919876543210"
-              />
-            </div>
-          </div>
-
-          <div className="formGroup">
-            <label>Total Principal Amount Lent (₹) *</label>
-            <input
-              type="number"
-              required
-              min="1"
-              value={principalAmount}
-              onChange={e => setPrincipalAmount(e.target.value)}
-              placeholder="e.g. 12000"
-            />
-          </div>
-
-          <div className="formGroup">
-            <label>EMI Duration Options (Months) *</label>
-            <div className="durationPresetsGrid">
-              {["1", "2", "3", "6", "9", "12"].map(d => (
-                <button
-                  key={d}
-                  type="button"
-                  className={`durationBtn ${durationPreset === d ? "active" : ""}`}
-                  onClick={() => setDurationPreset(d)}
-                >
-                  {d} Month{d !== "1" ? "s" : ""}
-                </button>
-              ))}
-              <button
-                type="button"
-                className={`durationBtn ${durationPreset === "custom" ? "active" : ""}`}
-                onClick={() => setDurationPreset("custom")}
-              >
-                Custom
-              </button>
-            </div>
-
-            {durationPreset === "custom" && (
-              <div style={{ marginTop: "10px" }}>
-                <input
-                  type="number"
-                  min="1"
-                  max="120"
-                  value={customDuration}
-                  onChange={e => setCustomDuration(e.target.value)}
-                  placeholder="Enter number of months..."
-                  className="searchInput"
-                  style={{ width: "100%" }}
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="formRowGrid">
-            <div className="formGroup">
-              <label>Start Date (Lent Date)</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-              />
-            </div>
-            <div className="formGroup">
-              <label>First Payment Due Date *</label>
-              <input
-                type="date"
-                required
-                value={firstDueDate}
-                onChange={e => setFirstDueDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {liveInstallments.length > 0 && (
-            <div style={{ background: "rgba(59, 130, 246, 0.08)", border: "1px solid rgba(59, 130, 246, 0.2)", padding: "12px 14px", borderRadius: "10px" }}>
-              <strong style={{ fontSize: "13px", color: "#60a5fa", display: "block", marginBottom: 6 }}>
-                📊 Calculated EMI Schedule Summary:
-              </strong>
-              <div style={{ fontSize: "12px", color: "var(--text-muted)", display: "flex", justifyContent: "space-between" }}>
-                <span>Total Amount: ₹{Number(principalAmount).toLocaleString('en-IN')}</span>
-                <span>Duration: {emiCount} months</span>
-                <span>EMI: ₹{liveInstallments[0].amount.toLocaleString('en-IN')}/mo</span>
-              </div>
-            </div>
-          )}
-
-          <div className="formGroup">
-            <label>Notes / Reason</label>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="e.g. Laptop loan split with friend..."
-              rows={2}
-            />
-          </div>
-
-          <div className="modalFooter">
-            <button type="button" className="secondaryBtn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="primaryBtn">Create Lending</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function LendingDetailModal({ lending, installments, payments, onClose, onOpenEmiPaymentModal, onSendWhatsAppReminder }) {
-  const principal = Number(lending.principal_amount) || 0;
-  const totalPaid = installments.reduce((sum, i) => sum + (Number(i.paid_amount) || 0), 0);
-  const remaining = Math.max(0, principal - totalPaid);
-  const today = todayStr();
-
-  return (
-    <div className="modalBackdrop fade-in">
-      <div className="modalCard glassPanel" style={{ maxWidth: "750px", width: "95%" }}>
-        <div className="modalHeader">
-          <div>
-            <h3>📋 EMI Schedule for {lending.person_name}</h3>
-            <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-              {lending.phone_number ? `Phone: ${lending.phone_number}` : ""}
-            </span>
-          </div>
-          <button className="iconBtn small" onClick={onClose}><X size={16} /></button>
-        </div>
-
-        <div className="metricsGrid" style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: 10, margin: "14px 0" }}>
-          <div className="metricCard" style={{ padding: 12 }}>
-            <small>Total Lent</small>
-            <strong style={{ fontSize: 16, color: "#10b981" }}>₹{principal.toLocaleString('en-IN')}</strong>
-          </div>
-          <div className="metricCard" style={{ padding: 12 }}>
-            <small>Total Paid</small>
-            <strong style={{ fontSize: 16, color: "#3b82f6" }}>₹{totalPaid.toLocaleString('en-IN')}</strong>
-          </div>
-          <div className="metricCard" style={{ padding: 12 }}>
-            <small>Remaining Balance</small>
-            <strong style={{ fontSize: 16, color: "#f5b942" }}>₹{remaining.toLocaleString('en-IN')}</strong>
-          </div>
-        </div>
-
-        <h4 style={{ fontSize: "14px", marginTop: 16, marginBottom: 8, color: "var(--text-main)" }}>
-          Installments breakdown ({installments.length} EMIs):
-        </h4>
-
-        <div className="emiTableContainer">
-          <table className="emiTable">
-            <thead>
-              <tr>
-                <th>EMI #</th>
-                <th>Due Date</th>
-                <th>Amount</th>
-                <th>Paid</th>
-                <th>Status</th>
-                <th style={{ textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {installments.map(inst => {
-                const status = deriveInstallmentStatus(inst, today);
-                const isPaid = status === "Paid";
-                const isOverdue = status === "Overdue";
-                const isPartial = status === "Partially Paid";
-
-                return (
-                  <tr key={inst.id}>
-                    <td><strong>#{inst.installment_number}</strong></td>
-                    <td>{inst.due_date}</td>
-                    <td><strong>₹{Number(inst.amount).toLocaleString('en-IN')}</strong></td>
-                    <td>₹{Number(inst.paid_amount || 0).toLocaleString('en-IN')}</td>
-                    <td>
-                      <span className={`badgeStatus ${isPaid ? "paid" : isPartial ? "partial" : isOverdue ? "overdue" : "pending"}`}>
-                        {status}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: "right" }}>
-                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                        {!isPaid && (
-                          <button
-                            className="secondaryBtn smallBtn"
-                            onClick={() => onOpenEmiPaymentModal(inst)}
-                            style={{ padding: "4px 8px", fontSize: "11px" }}
-                          >
-                            Log Pay
-                          </button>
-                        )}
-                        {!isPaid && (
-                          <button
-                            className="whatsappBtn"
-                            onClick={() => onSendWhatsAppReminder(inst)}
-                            style={{ padding: "4px 8px", fontSize: "11px" }}
-                          >
-                            WhatsApp 📲
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {payments.length > 0 && (
-          <div style={{ marginTop: 20 }}>
-            <h4 style={{ fontSize: "14px", marginBottom: 8, color: "var(--text-main)" }}>
-              Payment History ({payments.length} payments):
-            </h4>
-            <div className="emiTableContainer">
-              <table className="emiTable">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Amount Paid</th>
-                    <th>Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payments.map(p => (
-                    <tr key={p.id}>
-                      <td>{p.payment_date}</td>
-                      <td><strong style={{ color: "#10b981" }}>+₹{Number(p.amount).toLocaleString('en-IN')}</strong></td>
-                      <td>{p.notes || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        <div className="modalFooter" style={{ marginTop: 20 }}>
-          <button className="primaryBtn" onClick={onClose}>Close</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EmiPaymentModal({ installment, lending, onClose, onConfirm }) {
-  const remainingInst = Math.max(0, (Number(installment.amount) || 0) - (Number(installment.paid_amount) || 0));
-  const [payAmount, setPayAmount] = useState(remainingInst);
-  const [notes, setNotes] = useState("");
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!payAmount || Number(payAmount) <= 0) {
-      alert("Please enter a valid payment amount.");
-      return;
-    }
-    onConfirm(installment.id, Number(payAmount), notes);
-  };
-
-  return (
-    <div className="modalBackdrop fade-in">
-      <div className="modalCard glassPanel" style={{ maxWidth: "460px" }}>
-        <div className="modalHeader">
-          <h3>+ Log Payment for {lending.person_name}</h3>
-          <button className="iconBtn small" onClick={onClose}><X size={16} /></button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="modalForm">
-          <div style={{ background: "rgba(59, 130, 246, 0.08)", padding: 12, borderRadius: 8, fontSize: 13 }}>
-            <div><strong>Installment #{installment.installment_number}</strong> — Due Date: {installment.due_date}</div>
-            <div>Installment Amount: ₹{Number(installment.amount).toLocaleString('en-IN')}</div>
-            <div>Already Paid: ₹{Number(installment.paid_amount || 0).toLocaleString('en-IN')}</div>
-            <div style={{ color: "#f5b942", fontWeight: 700, marginTop: 4 }}>
-              Remaining Unpaid for this EMI: ₹{remainingInst.toLocaleString('en-IN')}
-            </div>
-          </div>
-
-          <div className="formGroup">
-            <label>Payment Amount Received (₹) *</label>
-            <input
-              type="number"
-              required
-              min="1"
-              max={remainingInst * 2}
-              value={payAmount}
-              onChange={e => setPayAmount(e.target.value)}
-            />
-          </div>
-
-          <div className="formGroup">
-            <label>Notes / Payment Ref</label>
-            <input
-              type="text"
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="e.g. GPay transaction ID, cash..."
-            />
-          </div>
-
-          <div className="modalFooter">
-            <button type="button" className="secondaryBtn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="primaryBtn">Confirm Payment</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function DueQuestCard({ due, today, type, onLogPayment, onDelete }) {
-  const original = Number(due.original_amount) || 0;
-  const paid = Number(due.amount_paid) || 0;
-  const remaining = Math.max(0, original - paid);
-  const pct = original > 0 ? Math.min(100, Math.round((paid / original) * 100)) : 0;
-  const isSettled = due.status === "Paid" || remaining === 0;
-
-  return (
-    <div className={`questItem ${isSettled ? "completed" : ""}`} style={{ flexDirection: "column", alignItems: "stretch", gap: 10, padding: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div className="questContent" style={{ flex: 1 }}>
-          <div className="questTitleRow">
-            <strong className="questTitle" style={{ fontSize: "15px" }}>{due.person_name}</strong>
-            {isSettled && <span className="badgeStatus paid">✓ Paid</span>}
-            {!isSettled && <span className="badgeStatus overdue">Pending</span>}
-          </div>
-
-          {due.reason && <p className="questDescText" style={{ marginTop: 2, marginBottom: 4 }}>{due.reason}</p>}
-        </div>
-
-        <div className="questRight" style={{ flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-          <strong style={{ fontSize: "16px", color: "#ef4444" }}>
-            -₹{remaining.toLocaleString('en-IN')}
-          </strong>
-          <small style={{ fontSize: "11px", color: "#8b96a8" }}>
-            {paid > 0 ? `₹${paid.toLocaleString('en-IN')} paid of ₹${original.toLocaleString('en-IN')}` : `₹${original.toLocaleString('en-IN')} total`}
-          </small>
-        </div>
-      </div>
-
-      <div className="levelBarContainer" style={{ height: 4, borderRadius: 2, background: "#1e2638" }}>
-        <div className="levelBarFill" style={{ width: `${pct}%`, background: isSettled ? "#10b981" : "#ef4444" }}></div>
-      </div>
-
-      <div className="questTitleRow" style={{ justifyContent: "space-between", marginTop: 4 }}>
-        <div style={{ display: "flex", gap: 6 }}>
-          {!isSettled && (
-            <button className="primaryBtn smallBtn" onClick={() => onLogPayment(due)} style={{ padding: "4px 10px", fontSize: "11px" }}>
-              Log Debt Payment
-            </button>
-          )}
-        </div>
-
-        <div style={{ display: "flex", gap: 4 }}>
-          <button className="iconBtn small dangerHover" onClick={() => onDelete(due.id)} title="Delete debt">
-            <Trash2 size={13} />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DueModal({ modalData, onClose, onSave }) {
-  const due = modalData.due || {};
-  const [personName, setPersonName] = useState(due.person_name || "");
-  const [originalAmount, setOriginalAmount] = useState(due.original_amount || "");
-  const [amountPaid, setAmountPaid] = useState(due.amount_paid || 0);
-  const [dueDate, setDueDate] = useState(due.due_date || "");
-  const [reason, setReason] = useState(due.reason || "");
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!personName.trim() || !originalAmount || Number(originalAmount) <= 0) {
-      alert("Please provide creditor name and total amount owed.");
-      return;
-    }
-
-    onSave({
-      isNew: modalData.isNew,
-      id: due.id,
-      person_name: personName.trim(),
-      original_amount: Number(originalAmount),
-      amount_paid: Number(amountPaid) || 0,
-      due_date: dueDate || null,
-      reason: reason.trim(),
-      status: Number(amountPaid) >= Number(originalAmount) ? "Paid" : "Pending"
-    });
-  };
-
-  return (
-    <div className="modalBackdrop fade-in">
-      <div className="modalCard glassPanel" style={{ maxWidth: "500px" }}>
-        <div className="modalHeader">
-          <h3>💳 {modalData.isNew ? "Add Debt Owed" : "Edit Debt Record"}</h3>
-          <button className="iconBtn small" onClick={onClose}><X size={16} /></button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="modalForm">
-          <div className="formGroup">
-            <label>Lender / Creditor Name *</label>
-            <input
-              type="text"
-              required
-              value={personName}
-              onChange={e => setPersonName(e.target.value)}
-              placeholder="e.g. Bank, HDFC, Friend..."
-            />
-          </div>
-
-          <div className="formRowGrid">
-            <div className="formGroup">
-              <label>Total Amount Owed (₹) *</label>
-              <input
-                type="number"
-                required
-                min="1"
-                value={originalAmount}
-                onChange={e => setOriginalAmount(e.target.value)}
-                placeholder="e.g. 5000"
-              />
-            </div>
-            <div className="formGroup">
-              <label>Amount Already Paid (₹)</label>
-              <input
-                type="number"
-                min="0"
-                value={amountPaid}
-                onChange={e => setAmountPaid(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-          </div>
-
-          <div className="formGroup">
-            <label>Due Date</label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={e => setDueDate(e.target.value)}
-            />
-          </div>
-
-          <div className="formGroup">
-            <label>Notes / Reason</label>
-            <textarea
-              value={reason}
-              onChange={e => setReason(e.target.value)}
-              placeholder="e.g. Credit card bill, borrowed for shopping..."
-              rows={2}
-            />
-          </div>
-
-          <div className="modalFooter">
-            <button type="button" className="secondaryBtn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="primaryBtn">Save Debt</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-class ErrorBoundary extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error("Ascend Runtime Error:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{
-          minHeight: "100vh",
-          backgroundColor: "#0b0d14",
-          color: "#e2e8f0",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "20px",
-          textAlign: "center",
-          fontFamily: "system-ui, -apple-system, sans-serif"
-        }}>
-          <div style={{
-            background: "rgba(255, 255, 255, 0.05)",
-            border: "1px solid rgba(255, 255, 255, 0.1)",
-            borderRadius: "16px",
-            padding: "32px",
-            maxWidth: "480px",
-            width: "100%",
-            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.5)"
-          }}>
-            <div style={{ fontSize: "3rem", marginBottom: "16px" }}>⚡</div>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "8px", color: "#fff" }}>
-              Vault Recovery Shield
-            </h2>
-            <p style={{ color: "#a0aec0", fontSize: "0.95rem", marginBottom: "16px", lineHeight: "1.5" }}>
-              A rendering glitch occurred. Click below to refresh cleanly and restore your session.
-            </p>
-            {this.state.error && (
-              <pre style={{
-                background: "rgba(0,0,0,0.4)",
-                color: "#f56565",
-                padding: "10px",
-                borderRadius: "8px",
-                fontSize: "0.75rem",
-                textAlign: "left",
-                overflowX: "auto",
-                marginBottom: "20px",
-                maxHeight: "120px"
-              }}>
-                {this.state.error.toString()}
-              </pre>
-            )}
-            <button
-              onClick={() => {
-                try {
-                  localStorage.clear();
-                  sessionStorage.clear();
-                } catch (e) {}
-                window.location.reload();
-              }}
-              style={{
-                backgroundColor: "#4f46e5",
-                color: "#fff",
-                border: "none",
-                padding: "12px 24px",
-                borderRadius: "8px",
-                fontWeight: "600",
-                fontSize: "1rem",
-                cursor: "pointer",
-                transition: "all 0.2s"
-              }}
-            >
-              Reset & Reload Vault 🔄
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 // --- RENDER APPLICATION ---
-createRoot(document.getElementById("root")).render(
-  <ErrorBoundary>
-    <App />
-  </ErrorBoundary>
-);
+createRoot(document.getElementById("root")).render(<App />);

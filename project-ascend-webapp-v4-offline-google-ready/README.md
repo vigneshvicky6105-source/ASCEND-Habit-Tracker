@@ -1,7 +1,5 @@
 # Project Ascend — Personal Productivity OS
 
-**🌐 Live Production App**: [https://project-ascend-webapp-v4-offline-go.vercel.app/](https://project-ascend-webapp-v4-offline-go.vercel.app/)
-
 Project Ascend is your offline-first personal productivity operating system designed for laptop and mobile (installable PWA). It manages daily main quests, core learning concepts, reading progress, wishlist rewards, real performance analytics, and cloud synchronization with Supabase PostgreSQL and Google OAuth.
 
 ---
