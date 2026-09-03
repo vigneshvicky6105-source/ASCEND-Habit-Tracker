@@ -254,9 +254,12 @@ function useUserOnlineState(user) {
       });
 
       let finalTasks = tasks || [];
-      if (finalTasks.length === 0 && userId && !missing.includes("tasks")) {
-        // Seed initial 9 baseline starter tasks with deterministic UUIDs & quest_key to Supabase Cloud Database
-        const seedTasks = STARTER_QUESTS.map((q, idx) => ({
+      
+      // Ensure all 9 baseline starter quests exist in finalTasks without duplicating
+      const existingKeys = new Set((finalTasks || []).map(t => normalizeQuestSlug(t)));
+      const missingBaselineTasks = STARTER_QUESTS
+        .filter(q => !existingKeys.has(q.quest_key) && !existingKeys.has(q.title.replace(/\s+/g, " ").trim().toLowerCase()))
+        .map((q, idx) => ({
           id: getBaselineQuestUuid(userId, q.quest_key),
           user_id: userId,
           quest_key: q.quest_key,
@@ -266,28 +269,31 @@ function useUserOnlineState(user) {
           xp: q.xp,
           locked: q.locked,
           active: true,
-          sort_order: idx,
+          sort_order: (finalTasks.length || 0) + idx,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }));
-        let { error: seedErr } = await supabase.from("tasks").upsert(seedTasks, { onConflict: "id" });
+
+      if (missingBaselineTasks.length > 0 && userId && !missing.includes("tasks")) {
+        console.log(`[ASCEND SYNC] Seeding ${missingBaselineTasks.length} missing baseline quests into Supabase...`);
+        let { error: seedErr } = await supabase.from("tasks").upsert(missingBaselineTasks, { onConflict: "id" });
         if (seedErr) {
           console.warn("[ASCEND SYNC] Primary starter tasks seeding warning:", seedErr);
-          const fallbackSeed = seedTasks.map(({ quest_key, ...rest }) => rest);
+          const fallbackSeed = missingBaselineTasks.map(({ quest_key, ...rest }) => rest);
           const { error: fbErr } = await supabase.from("tasks").upsert(fallbackSeed, { onConflict: "id" });
           if (fbErr) console.error("[ASCEND SYNC] Fallback starter tasks seeding error:", fbErr);
         }
-        finalTasks = seedTasks;
+        finalTasks = [...finalTasks, ...missingBaselineTasks];
       }
 
-      // Deduplicate tasks strictly by quest_key or normalized title to eliminate any historical duplicate entries
+      // Deduplicate tasks strictly by normalized slug to eliminate any historical duplicate entries
       const seenTaskKeys = new Set();
       const dedupedTasks = [];
       const duplicateTaskIds = [];
 
       (finalTasks || []).forEach(t => {
         if (!t) return;
-        const key = t.quest_key || (t.title ? t.title.trim().toLowerCase() : t.id);
+        const key = normalizeQuestSlug(t);
         if (seenTaskKeys.has(key)) {
           if (t.id) duplicateTaskIds.push(t.id);
         } else {
@@ -298,8 +304,10 @@ function useUserOnlineState(user) {
 
       if (duplicateTaskIds.length > 0 && userId && supabase) {
         console.log(`[ASCEND SYNC] Purging ${duplicateTaskIds.length} duplicate task IDs from cloud database...`);
-        const { error: purgeErr } = await supabase.from("tasks").delete().in("id", duplicateTaskIds);
-        if (purgeErr) console.error("[ASCEND SYNC] Error purging duplicate tasks in DB:", purgeErr);
+        supabase.from("tasks").delete().in("id", duplicateTaskIds).eq("user_id", userId).then(({ error }) => {
+          if (error) console.error("[ASCEND SYNC] Error purging duplicate tasks in DB:", error);
+          else console.log("[ASCEND SYNC] Duplicate tasks purged successfully from cloud database.");
+        });
       }
 
       finalTasks = dedupedTasks;
@@ -350,11 +358,11 @@ function useUserOnlineState(user) {
   useEffect(() => {
     if (!userId) {
       setState({
-        tasks: STARTER_QUESTS.map((q, idx) => ({ id: `starter-${idx}`, title: q.title, category: q.category, target: q.target, xp: q.xp, locked: q.locked, active: true, sort_order: idx })),
+        tasks: STARTER_QUESTS.map((q, idx) => ({ id: getBaselineQuestUuid(null, q.quest_key), quest_key: q.quest_key, title: q.title, category: q.category, target: q.target, xp: q.xp, locked: q.locked, active: true, sort_order: idx })),
         completions: {},
         books: [],
         wishlist: [],
-        concepts: STARTER_CONCEPTS.map((c, idx) => ({ id: `concept-${idx}`, title: c.title, subtitle: c.subtitle, sort_order: idx })),
+        concepts: STARTER_CONCEPTS.map((c, idx) => ({ id: getBaselineQuestUuid(null, `concept_${idx}`), title: c.title, subtitle: c.subtitle, sort_order: idx })),
         side_quests: [],
         ai_chat_history: [],
         challenges: STARTER_CHALLENGES,
