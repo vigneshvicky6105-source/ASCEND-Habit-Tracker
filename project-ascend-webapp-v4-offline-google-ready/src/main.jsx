@@ -270,9 +270,14 @@ function useUserOnlineState(user) {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }));
-        const { error: seedErr } = await supabase.from("tasks").upsert(seedTasks, { onConflict: "id" });
-        if (seedErr) console.error("[ASCEND SYNC] Starter tasks DB seeding error:", seedErr);
-        else finalTasks = seedTasks;
+        let { error: seedErr } = await supabase.from("tasks").upsert(seedTasks, { onConflict: "id" });
+        if (seedErr) {
+          console.warn("[ASCEND SYNC] Primary starter tasks seeding warning:", seedErr);
+          const fallbackSeed = seedTasks.map(({ quest_key, ...rest }) => rest);
+          const { error: fbErr } = await supabase.from("tasks").upsert(fallbackSeed, { onConflict: "id" });
+          if (fbErr) console.error("[ASCEND SYNC] Fallback starter tasks seeding error:", fbErr);
+        }
+        finalTasks = seedTasks;
       }
 
       // Deduplicate tasks strictly by quest_key or normalized title to eliminate any historical duplicate entries
@@ -788,7 +793,13 @@ function App() {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }));
-        await supabase.from("tasks").upsert(seedTasks, { onConflict: "id" });
+
+        let { error: seedErr } = await supabase.from("tasks").upsert(seedTasks, { onConflict: "id" });
+        if (seedErr) {
+          console.warn("[ASCEND SYNC] Reset starter tasks seeding warning:", seedErr);
+          const fallbackSeed = seedTasks.map(({ quest_key, ...rest }) => rest);
+          await supabase.from("tasks").upsert(fallbackSeed, { onConflict: "id" });
+        }
 
         const seedConcepts = STARTER_CONCEPTS.map((c, idx) => ({
           id: getBaselineQuestUuid(user.id, `concept_${idx}`),
