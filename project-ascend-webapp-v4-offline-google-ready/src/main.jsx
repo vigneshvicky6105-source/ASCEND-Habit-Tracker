@@ -722,6 +722,74 @@ function App() {
     }
   };
 
+  const clearAllUserData = async () => {
+    if (!confirm("⚠️ DANGER: Are you sure you want to permanently delete ALL saved quests, completions, books, wishlist items, dues, and lending records from your account and start fresh?")) {
+      return;
+    }
+
+    try {
+      if (user && supabase) {
+        const tables = [
+          "task_completions",
+          "tasks",
+          "books",
+          "wishlist",
+          "core_concepts",
+          "side_quests",
+          "dues",
+          "lending_payments",
+          "lending_installments",
+          "lending",
+          "whatsapp_reminders",
+          "profile_settings"
+        ];
+
+        for (const table of tables) {
+          await supabase.from(table).delete().eq("user_id", user.id);
+        }
+
+        // Re-seed initial clean starter quests for the user
+        const seedTasks = STARTER_QUESTS.map((q, idx) => ({
+          id: getStarterTaskId(user.id, idx),
+          user_id: user.id,
+          title: q.title,
+          category: q.category,
+          target: q.target,
+          xp: q.xp,
+          locked: q.locked,
+          active: true,
+          sort_order: idx,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }));
+        await supabase.from("tasks").upsert(seedTasks, { onConflict: "id" });
+
+        const seedConcepts = STARTER_CONCEPTS.map((c, idx) => ({
+          id: getStarterTaskId(user.id, idx + 10),
+          user_id: user.id,
+          title: c.title,
+          subtitle: c.subtitle,
+          sort_order: idx,
+          created_at: new Date().toISOString()
+        }));
+        await supabase.from("core_concepts").upsert(seedConcepts, { onConflict: "id" });
+      }
+
+      // Clear local backups and storage
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch (e) {}
+
+      alert("🧹 Account successfully reset! All data cleared and fresh starter quests initialized.");
+      fetchOnlineData();
+      window.location.reload();
+    } catch (err) {
+      console.error("Reset data error:", err);
+      alert("Error resetting data: " + err.message);
+    }
+  };
+
   // --- CORE CONCEPTS ACTIONS ---
   const saveConceptModal = async (conceptData) => {
     if (!user) {
@@ -1731,6 +1799,7 @@ function App() {
           setGeminiKey={setGeminiKey}
           handleGoogleLogin={handleGoogleLogin}
           handleLogout={handleLogout}
+          onClearAllData={clearAllUserData}
         />
       )}
 
@@ -4011,7 +4080,7 @@ function ChallengesView({ local, setLocal }) {
 // ==========================================
 // 6. SETTINGS VIEW COMPONENT
 // ==========================================
-function SettingsView({ user, online, syncWithCloud, syncing, notifPermission, requestNotificationPermission, geminiKey, setGeminiKey, handleGoogleLogin, handleLogout }) {
+function SettingsView({ user, online, syncWithCloud, syncing, notifPermission, requestNotificationPermission, geminiKey, setGeminiKey, handleGoogleLogin, handleLogout, onClearAllData }) {
   return (
     <main className="viewContainer fade-in">
       <div className="pageHeaderRow">
@@ -4101,6 +4170,24 @@ function SettingsView({ user, online, syncWithCloud, syncing, notifPermission, r
         <p className="settingsDesc">
           Project Ascend uses IndexedDB as its primary database. The web app functions 100% offline, caching app shell assets via Service Worker. When internet reconnects, state automatically syncs to your Supabase PostgreSQL cloud tables.
         </p>
+      </div>
+
+      <div className="glassPanel marginTop" style={{ border: "1px solid rgba(239, 68, 68, 0.4)", background: "rgba(239, 68, 68, 0.05)" }}>
+        <h3 style={{ color: "#f87171" }}>🚨 Danger Zone: Reset Account & Clear All Data</h3>
+        <p className="settingsDesc">
+          Permanently delete all saved quests, history, completion records, reading books, wishlist items, dues, and lending data from your cloud account and start fresh with default starter quests.
+        </p>
+
+        <div className="settingsActions" style={{ marginTop: 14 }}>
+          <button
+            className="secondaryBtn"
+            onClick={onClearAllData}
+            style={{ background: "rgba(239, 68, 68, 0.15)", borderColor: "#ef4444", color: "#fca5a5" }}
+          >
+            <Trash2 size={16} />
+            <span>Reset Vault & Clear All Data Freshly 🧹</span>
+          </button>
+        </div>
       </div>
     </main>
   );
