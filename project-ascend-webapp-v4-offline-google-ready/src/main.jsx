@@ -2,8 +2,8 @@ import React, { useEffect, useState, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
 import {
-  Check, Flame, Plus, Settings, BookOpen, LogIn, LogOut, WifiOff, Cloud,
-  Pencil, Trash2, ArrowUp, ArrowDown, Lock, Unlock, Calendar, Trophy,
+  Check, Flame, Plus, Settings, BookOpen, LogIn, LogOut, WifiOff, Cloud, Dumbbell, Activity, Scale, Apple, Droplets,
+  Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpRight, ArrowDownLeft, Lock, Unlock, Calendar, Trophy,
   BarChart2, Sparkles, X, ChevronRight, RefreshCw, ShoppingCart, Target, Wallet,
   Layers, CheckCircle2, Circle, Swords, Shield, Clock, CalendarDays, Bell, BellOff
 } from "lucide-react";
@@ -17,6 +17,11 @@ import "./styles.css";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://vpfuiifncfzndkxstrwe.supabase.co";
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_gL3Gvfi67rQe2eDH42XG1A_4W0sOMuN";
 const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 // --- DEFAULT STARTER DATA ---
 const STARTER_QUESTS = [
@@ -42,13 +47,39 @@ const STARTER_CONCEPTS = [
   { title: "Web Development", subtitle: "Daily learning target" }
 ];
 
+
+const STARTER_DUES = [
+  {
+    id: "starter-due-1",
+    person_name: "Rahul Sharma",
+    type: "lent",
+    original_amount: 5000,
+    amount_paid: 2000,
+    date: todayStr(),
+    due_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+    reason: "Weekend trip expense split",
+    status: "Partially Paid"
+  },
+  {
+    id: "starter-due-2",
+    person_name: "Ankit Verma",
+    type: "owed",
+    original_amount: 1200,
+    amount_paid: 0,
+    date: todayStr(),
+    due_date: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10),
+    reason: "Dinner bill split",
+    status: "Pending"
+  }
+];
+
 const STARTER_CHALLENGES = [
   { id: "ch-1", title: "30-Day Coding Challenge", category: "Coding", targetDays: 30, completedDays: 12, rewardXp: 500, active: true },
   { id: "ch-2", title: "Read 10 Pages Daily for 30 Days", category: "Reading", targetDays: 30, completedDays: 8, rewardXp: 300, active: true },
   { id: "ch-3", title: "Apply to 30 Tech Jobs", category: "Career", targetDays: 30, completedDays: 15, rewardXp: 400, active: true }
 ];
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+
 const PRIORITY_ORDER = { "High": 1, "Medium": 2, "Low": 3 };
 
 function getLevelRankTitle(level) {
@@ -70,8 +101,8 @@ function getLevelRankTitle(level) {
 
 // --- INDEXEDDB MULTI-USER ISOLATED STORAGE ---
 const DB_NAME = "project_ascend_v4_db";
-const DB_VERSION = 5;
-const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus", "dues"];
+const DB_VERSION = 6;
+const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus", "dues", "fitness"];
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -132,15 +163,17 @@ async function idbSaveUserRecords(storeName, records, userId) {
 function useUserLocalState(user) {
   const userId = user?.id || "guest";
   const [state, setState] = useState({
-    tasks: [],
-    completions: {}, // map key -> true ("taskId:YYYY-MM-DD")
+    tasks: STARTER_QUESTS.map((q, idx) => ({ id: `starter-${idx}`, user_id: userId, title: q.title, category: q.category, target: q.target, xp: q.xp, locked: q.locked, active: true, sort_order: idx })),
+    completions: {},
     books: [],
     wishlist: [],
-    concepts: [],
+    concepts: STARTER_CONCEPTS.map((c, idx) => ({ id: `concept-${idx}`, user_id: userId, title: c.title, subtitle: c.subtitle, sort_order: idx })),
     side_quests: [],
     ai_chat_history: [],
-    challenges: [],
-    daily_focus: {}
+    challenges: STARTER_CHALLENGES.map(c => ({ ...c, user_id: userId })),
+    daily_focus: {},
+    dues: STARTER_DUES,
+    fitness: { weights: [], nutrition: [], workouts: [] }
   });
   const [ready, setReady] = useState(false);
 
@@ -340,6 +373,125 @@ function App() {
   const [wishlistModal, setWishlistModal] = useState(null); // null | { isNew: bool, item: obj }
   const [conceptModal, setConceptModal] = useState(null); // null | { isNew: bool, concept: obj }
   const [sideQuestModal, setSideQuestModal] = useState(null); // null | { isNew: bool, quest?: obj, defaultDate?: string }
+  
+  const [fitnessSubTab, setFitnessSubTab] = useState("weight"); // "weight" | "nutrition" | "workouts"
+  const [weightModal, setWeightModal] = useState(null); // null | { isNew: bool, item?: obj }
+  const [nutritionModal, setNutritionModal] = useState(null); // null | { isNew: bool, item?: obj }
+  const [workoutModal, setWorkoutModal] = useState(null); // null | { isNew: bool, item?: obj }
+
+  const saveWeightEntry = (entry) => {
+    setLocal(s => {
+      const fit = s.fitness || { weights: [], nutrition: [], workouts: [] };
+      const list = [...(fit.weights || [])];
+      if (entry.isNew) {
+        list.push({
+          id: entry.id || crypto.randomUUID(),
+          date: entry.date,
+          weight: entry.weight,
+          body_fat: entry.body_fat,
+          notes: entry.notes
+        });
+      } else {
+        const idx = list.findIndex(w => w.id === entry.id);
+        if (idx !== -1) {
+          list[idx] = { ...list[idx], date: entry.date, weight: entry.weight, body_fat: entry.body_fat, notes: entry.notes };
+        }
+      }
+      list.sort((a, b) => (a.date > b.date ? 1 : -1));
+      return { ...s, fitness: { ...fit, weights: list } };
+    });
+    setWeightModal(null);
+  };
+
+  const deleteWeightEntry = (id) => {
+    if (confirm("Delete this weight entry?")) {
+      setLocal(s => {
+        const fit = s.fitness || { weights: [], nutrition: [], workouts: [] };
+        return {
+          ...s,
+          fitness: { ...fit, weights: (fit.weights || []).filter(w => w.id !== id) }
+        };
+      });
+    }
+  };
+
+  const saveNutritionEntry = (entry) => {
+    setLocal(s => {
+      const fit = s.fitness || { weights: [], nutrition: [], workouts: [] };
+      const list = [...(fit.nutrition || [])];
+      if (entry.isNew) {
+        list.push({
+          id: entry.id || crypto.randomUUID(),
+          date: entry.date,
+          calories: entry.calories,
+          protein: entry.protein,
+          carbs: entry.carbs,
+          fat: entry.fat,
+          water: entry.water,
+          notes: entry.notes
+        });
+      } else {
+        const idx = list.findIndex(n => n.id === entry.id);
+        if (idx !== -1) {
+          list[idx] = { ...list[idx], date: entry.date, calories: entry.calories, protein: entry.protein, carbs: entry.carbs, fat: entry.fat, water: entry.water, notes: entry.notes };
+        }
+      }
+      list.sort((a, b) => (a.date > b.date ? -1 : 1));
+      return { ...s, fitness: { ...fit, nutrition: list } };
+    });
+    setNutritionModal(null);
+  };
+
+  const deleteNutritionEntry = (id) => {
+    if (confirm("Delete this nutrition log?")) {
+      setLocal(s => {
+        const fit = s.fitness || { weights: [], nutrition: [], workouts: [] };
+        return {
+          ...s,
+          fitness: { ...fit, nutrition: (fit.nutrition || []).filter(n => n.id !== id) }
+        };
+      });
+    }
+  };
+
+  const saveWorkoutEntry = (entry) => {
+    setLocal(s => {
+      const fit = s.fitness || { weights: [], nutrition: [], workouts: [] };
+      const list = [...(fit.workouts || [])];
+      if (entry.isNew) {
+        list.push({
+          id: entry.id || crypto.randomUUID(),
+          date: entry.date,
+          title: entry.title,
+          category: entry.category,
+          duration: entry.duration,
+          calories_burned: entry.calories_burned,
+          notes: entry.notes
+        });
+      } else {
+        const idx = list.findIndex(w => w.id === entry.id);
+        if (idx !== -1) {
+          list[idx] = { ...list[idx], date: entry.date, title: entry.title, category: entry.category, duration: entry.duration, calories_burned: entry.calories_burned, notes: entry.notes };
+        }
+      }
+      list.sort((a, b) => (a.date > b.date ? -1 : 1));
+      return { ...s, fitness: { ...fit, workouts: list } };
+    });
+    setWorkoutModal(null);
+  };
+
+  const deleteWorkoutEntry = (id) => {
+    if (confirm("Delete this workout log?")) {
+      setLocal(s => {
+        const fit = s.fitness || { weights: [], nutrition: [], workouts: [] };
+        return {
+          ...s,
+          fitness: { ...fit, workouts: (fit.workouts || []).filter(w => w.id !== id) }
+        };
+      });
+    }
+  };
+
   const [dueModal, setDueModal] = useState(null); // null | { isNew: bool, due?: obj, defaultType?: string }
   const [duesSubTab, setDuesSubTab] = useState("lent"); // "lent" | "owed"
   const [questSubTab, setQuestSubTab] = useState("main"); // "main" | "side"
@@ -417,7 +569,7 @@ function App() {
       }
 
       // 2. Task Completions Sync
-      const completionRows = Object.keys(local.completions)
+      const completionRows = Object.keys(local.completions || {})
         .filter(k => local.completions[k])
         .map(k => {
           const [task_id, completed_on] = k.split(":");
@@ -430,9 +582,9 @@ function App() {
       }
 
       // 3. Books Sync
-      if (local.books.length > 0) {
+      if ((local.books || []).length > 0) {
         await supabase.from("books").upsert(
-          local.books.map(b => ({
+          (local.books || []).map(b => ({
             id: b.id.startsWith("book-") ? undefined : b.id,
             user_id: uid,
             title: b.title,
@@ -863,7 +1015,7 @@ function App() {
 
   // --- QUICK LOG 10 PAGES READING ACTION ---
   const logReadingTenPages = () => {
-    const activeBook = local.books.find(b => b.status === "Reading") || local.books[0];
+    const activeBook = (local.books || []).find(b => b.status === "Reading") || local.books[0];
     if (activeBook) {
       const newPage = (activeBook.current_page || 0) + 10;
       const isComplete = activeBook.total_pages > 0 && newPage >= activeBook.total_pages;
@@ -907,7 +1059,7 @@ function App() {
   // Level logic: level = floor(Total Cumulative XP / 100) + 1
   const totalXpAllTime = useMemo(() => {
     let total = 0;
-    Object.keys(local.completions).forEach(k => {
+    Object.keys(local.completions || {}).forEach(k => {
       if (local.completions[k]) {
         const [taskId] = k.split(":");
         const task = local.tasks.find(t => t.id === taskId);
@@ -1022,6 +1174,7 @@ function App() {
           { id: "reading", label: "Reading Center", icon: <BookOpen size={16} /> },
           { id: "wishlist", label: "Wishlist", icon: <ShoppingCart size={16} /> },
           { id: "dues", label: "Dues Tracker 💸", icon: <Wallet size={16} /> },
+          { id: "fitness", label: "Fitness & Health 🏋️", icon: <Dumbbell size={16} /> },
           { id: "analytics", label: "Analytics & Insights", icon: <BarChart2 size={16} /> },
           { id: "ai", label: "Ascend AI 🤖", icon: <Sparkles size={16} /> },
           { id: "achievements", label: "Achievements 🏆", icon: <Trophy size={16} /> },
@@ -1142,6 +1295,21 @@ function App() {
         />
       )}
 
+      
+      {tab === "fitness" && (
+        <FitnessView
+          fitness={local.fitness || { weights: [], nutrition: [], workouts: [] }}
+          subTab={fitnessSubTab}
+          setSubTab={setFitnessSubTab}
+          onOpenWeightModal={setWeightModal}
+          onDeleteWeight={deleteWeightEntry}
+          onOpenNutritionModal={setNutritionModal}
+          onDeleteNutrition={deleteNutritionEntry}
+          onOpenWorkoutModal={setWorkoutModal}
+          onDeleteWorkout={deleteWorkoutEntry}
+        />
+      )}
+
       {tab === "analytics" && (
         <AnalyticsView
           local={local}
@@ -1184,6 +1352,31 @@ function App() {
       )}
 
       
+      
+      {weightModal && (
+        <WeightModal
+          modalData={weightModal}
+          onClose={() => setWeightModal(null)}
+          onSave={saveWeightEntry}
+        />
+      )}
+
+      {nutritionModal && (
+        <NutritionModal
+          modalData={nutritionModal}
+          onClose={() => setNutritionModal(null)}
+          onSave={saveNutritionEntry}
+        />
+      )}
+
+      {workoutModal && (
+        <WorkoutModal
+          modalData={workoutModal}
+          onClose={() => setWorkoutModal(null)}
+          onSave={saveWorkoutEntry}
+        />
+      )}
+
       {dueModal && (
         <DueModal
           modalData={dueModal}
@@ -1295,7 +1488,7 @@ function DashboardView({
     weekday: "long", day: "numeric", month: "long", year: "numeric"
   });
 
-  const activeBook = local.books.find(b => b.status === "Reading") || local.books[0];
+  const activeBook = (local.books || []).find(b => b.status === "Reading") || local.books[0];
   const rankInfo = getLevelRankTitle(currentLevel);
   const todayFocusGoal = (local.daily_focus || {})[todayStr()] || "";
   const [focusInput, setFocusInput] = useState(todayFocusGoal);
@@ -1430,7 +1623,7 @@ function DashboardView({
         <div className="metricCard">
           <div className="metricIcon book"><BookOpen size={22} /></div>
           <div className="metricData">
-            <strong>{local.books.length} Books</strong>
+            <strong>{(local.books || []).length} Books</strong>
             <small>Tracked in Library</small>
           </div>
         </div>
@@ -2858,7 +3051,7 @@ function AnalyticsView({ local, tasks, streakStats, totalXpAllTime }) {
   // Category performance breakdown
   const categoryStats = useMemo(() => {
     const map = {};
-    Object.keys(local.completions).forEach(k => {
+    Object.keys(local.completions || {}).forEach(k => {
       if (local.completions[k]) {
         const [taskId] = k.split(":");
         const task = tasks.find(t => t.id === taskId);
@@ -3781,8 +3974,734 @@ function WishlistModal({ modalData, onClose, onSave }) {
   );
 }
 
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("Ascend ErrorBoundary caught an error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="loadingShell" style={{ padding: 40, textAlign: "center", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyCenter: "center" }}>
+          <img src="/favicon-32.png" alt="Ascend Logo" style={{ width: 48, height: 48, marginBottom: 16 }} />
+          <h2 style={{ color: "#f5b942", fontSize: 20, marginBottom: 8, fontWeight: 900 }}>ASCEND RECOVERY MODE</h2>
+          <p style={{ color: "#8b96a8", fontSize: 13, maxWidth: 480, margin: "0 auto 20px" }}>
+            An unexpected error occurred during rendering. Your data is safe in IndexedDB.
+          </p>
+          <pre style={{ background: "#121622", border: "1px solid #1f2738", padding: 14, borderRadius: 10, color: "#f87171", fontSize: 11, maxWidth: 600, overflow: "auto", margin: "0 auto 20px", textAlign: "left" }}>
+            {String(this.state.error && this.state.error.stack || this.state.error)}
+          </pre>
+          <button
+            className="primaryBtn"
+            onClick={() => { window.location.reload(); }}
+          >
+            Reload Application
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // --- RENDER APPLICATION ---
-createRoot(document.getElementById("root")).render(<App />);
+
+// ==========================================
+// FITNESS & HEALTH VIEW COMPONENT
+// ==========================================
+function FitnessView({
+  fitness, subTab, setSubTab,
+  onOpenWeightModal, onDeleteWeight,
+  onOpenNutritionModal, onDeleteNutrition,
+  onOpenWorkoutModal, onDeleteWorkout
+}) {
+  const weights = fitness.weights || [];
+  const nutrition = fitness.nutrition || [];
+  const workouts = fitness.workouts || [];
+
+  // Weight statistics calculation
+  const sortedWeights = [...weights].sort((a, b) => (a.date > b.date ? 1 : -1));
+  const latestWeight = sortedWeights.length > 0 ? sortedWeights[sortedWeights.length - 1] : null;
+  const firstWeight = sortedWeights.length > 0 ? sortedWeights[0] : null;
+  const weightDiff = (latestWeight && firstWeight) ? (latestWeight.weight - firstWeight.weight).toFixed(1) : 0;
+  
+  const minWeight = sortedWeights.length > 0 ? Math.min(...sortedWeights.map(w => w.weight)) : 0;
+  const maxWeight = sortedWeights.length > 0 ? Math.max(...sortedWeights.map(w => w.weight)) : 0;
+
+  // Today's nutrition stats
+  const todayDateStr = todayStr();
+  const todayNutr = nutrition.find(n => n.date === todayDateStr) || { calories: 0, protein: 0, carbs: 0, fat: 0, water: 0 };
+  const targetCal = 2200;
+  const targetProtein = 160;
+  const targetWater = 3.0;
+
+  const calPct = Math.min(100, Math.round((todayNutr.calories / targetCal) * 100));
+  const protPct = Math.min(100, Math.round((todayNutr.protein / targetProtein) * 100));
+  const waterPct = Math.min(100, Math.round((todayNutr.water / targetWater) * 100));
+
+  return (
+    <main className="viewContainer fade-in">
+      <div className="pageHeaderRow">
+        <div>
+          <div className="eyebrowText"><Dumbbell size={13} /> HEALTH & ATHLETIC TRACKER</div>
+          <h2 className="pageTitle">FITNESS & HEALTH</h2>
+          <p className="pageSubtitle">Track daily bodyweight trends, calorie & macro intake, and workout history.</p>
+        </div>
+        <div className="pageHeaderActions">
+          {subTab === "weight" && (
+            <button className="primaryBtn" onClick={() => onOpenWeightModal({ isNew: true })}>
+              <Plus size={16} /> Log Weight
+            </button>
+          )}
+          {subTab === "nutrition" && (
+            <button className="primaryBtn" onClick={() => onOpenNutritionModal({ isNew: true })}>
+              <Plus size={16} /> Log Nutrition
+            </button>
+          )}
+          {subTab === "workouts" && (
+            <button className="primaryBtn" onClick={() => onOpenWorkoutModal({ isNew: true })}>
+              <Plus size={16} /> Log Workout
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* SUB TAB NAV BUTTONS */}
+      <div className="subTabContainer" style={{ marginBottom: 24 }}>
+        <button
+          className={"subTabBtn " + (subTab === "weight" ? "active" : "")}
+          onClick={() => setSubTab("weight")}
+        >
+          <Scale size={15} /> Weight & Body Fat ({weights.length})
+        </button>
+        <button
+          className={"subTabBtn " + (subTab === "nutrition" ? "active" : "")}
+          onClick={() => setSubTab("nutrition")}
+        >
+          <Apple size={15} /> Nutrition & Macros
+        </button>
+        <button
+          className={"subTabBtn " + (subTab === "workouts" ? "active" : "")}
+          onClick={() => setSubTab("workouts")}
+        >
+          <Activity size={15} /> Workout Log ({workouts.length})
+        </button>
+      </div>
+
+      {/* WEIGHT TAB CONTENT */}
+      {subTab === "weight" && (
+        <div className="space-y-6">
+          {/* WEIGHT METRICS SUMMARY CARDS */}
+          <div className="duesMetricsGrid">
+            <div className="metricCard">
+              <div className="metricIcon gold"><Scale size={22} /></div>
+              <div className="metricData">
+                <span className="metricVal">{latestWeight ? (latestWeight.weight + " kg") : "N/A"}</span>
+                <span className="metricLbl">Current Weight</span>
+              </div>
+            </div>
+            <div className="metricCard">
+              <div className="metricIcon gold"><Activity size={22} /></div>
+              <div className="metricData">
+                <span className="metricVal" style={{ color: weightDiff <= 0 ? "var(--color-success)" : "var(--color-warning)" }}>
+                  {weightDiff > 0 ? ("+" + weightDiff + " kg") : (weightDiff + " kg")}
+                </span>
+                <span className="metricLbl">Net Weight Change</span>
+              </div>
+            </div>
+            <div className="metricCard">
+              <div className="metricIcon gold"><Trophy size={22} /></div>
+              <div className="metricData">
+                <span className="metricVal">{minWeight ? (minWeight + " kg") : "N/A"}</span>
+                <span className="metricLbl">Lowest Logged</span>
+              </div>
+            </div>
+            <div className="metricCard">
+              <div className="metricIcon gold"><BarChart2 size={22} /></div>
+              <div className="metricData">
+                <span className="metricVal">{latestWeight && latestWeight.body_fat ? (latestWeight.body_fat + "%") : "N/A"}</span>
+                <span className="metricLbl">Current Body Fat %</span>
+              </div>
+            </div>
+          </div>
+
+          {/* WEIGHT PROGRESS CHART */}
+          {sortedWeights.length > 1 && (
+            <div className="glassPanel" style={{ padding: "20px 24px", marginBottom: 24 }}>
+              <h3 style={{ fontSize: "16px", marginBottom: "16px", display: "flex", alignItems: "center", gap: 8 }}>
+                <Scale size={18} style={{ color: "var(--accent-gold)" }} /> Bodyweight Progress Trend (kg)
+              </h3>
+              <div style={{ width: "100%", height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={sortedWeights}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1f2738" />
+                    <XAxis dataKey="date" stroke="#8b96a8" fontSize={11} />
+                    <YAxis domain={['dataMin - 1', 'dataMax + 1']} stroke="#8b96a8" fontSize={11} />
+                    <Tooltip
+                      contentStyle={{ background: "#121622", borderColor: "#1f2738", borderRadius: "10px", color: "#f3f4f6", fontSize: "12px" }}
+                      formatter={(val) => [val + " kg", "Weight"]}
+                    />
+                    <Line type="monotone" dataKey="weight" stroke="#f5b942" strokeWidth={3} dot={{ r: 4, fill: "#f5b942" }} activeDot={{ r: 7 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* WEIGHT LOG TABLE */}
+          {weights.length === 0 ? (
+            <div className="emptyStateCard glassPanel">
+              <Scale size={36} className="goldAccentIcon" />
+              <h3>No weight entries logged yet</h3>
+              <p>Start tracking your daily bodyweight to monitor health trends over time.</p>
+              <button className="primaryBtn" onClick={() => onOpenWeightModal({ isNew: true })} style={{ marginTop: 12 }}>
+                + Log First Weight Entry
+              </button>
+            </div>
+          ) : (
+            <div className="duesGrid">
+              {[...weights].sort((a, b) => (a.date > b.date ? -1 : 1)).map((w) => (
+                <div key={w.id} className="dueCard">
+                  <div className="dueHeader">
+                    <div>
+                      <span className="duePersonName">⚖️ {w.weight} kg</span>
+                      {w.body_fat ? <span className="dueBadgesRow"><span className="dueTypeTag lent">{w.body_fat}% Body Fat</span></span> : null}
+                    </div>
+                    <div className="dueActionBtns">
+                      <button className="iconBtn small" onClick={() => onOpenWeightModal({ isNew: false, item: w })}>
+                        <Pencil size={14} />
+                      </button>
+                      <button className="iconBtn small dangerHover" onClick={() => onDeleteWeight(w.id)}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="dueDatesRow">
+                    <span>Logged Date: {w.date}</span>
+                  </div>
+                  {w.notes && (
+                    <div className="dueReasonBlock">
+                      <strong>Note:</strong> {w.notes}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* NUTRITION TAB CONTENT */}
+      {subTab === "nutrition" && (
+        <div className="space-y-6">
+          {/* NUTRITION SUMMARY CARDS */}
+          <div className="duesMetricsGrid">
+            <div className="metricCard">
+              <div className="metricIcon gold"><Apple size={22} /></div>
+              <div className="metricData">
+                <span className="metricVal">{todayNutr.calories} / {targetCal} kcal</span>
+                <span className="metricLbl">Daily Calories ({calPct}%)</span>
+              </div>
+            </div>
+            <div className="metricCard">
+              <div className="metricIcon gold"><Activity size={22} /></div>
+              <div className="metricData">
+                <span className="metricVal" style={{ color: "var(--color-success)" }}>{todayNutr.protein} / {targetProtein}g</span>
+                <span className="metricLbl">Daily Protein ({protPct}%)</span>
+              </div>
+            </div>
+            <div className="metricCard">
+              <div className="metricIcon gold"><Droplets size={22} /></div>
+              <div className="metricData">
+                <span className="metricVal" style={{ color: "var(--color-blue)" }}>{todayNutr.water} / {targetWater}L</span>
+                <span className="metricLbl">Water Intake ({waterPct}%)</span>
+              </div>
+            </div>
+            <div className="metricCard">
+              <div className="metricIcon gold"><Flame size={22} /></div>
+              <div className="metricData">
+                <span className="metricVal">{todayNutr.carbs || 0}g C / {todayNutr.fat || 0}g F</span>
+                <span className="metricLbl">Carbs & Fat Breakdown</span>
+              </div>
+            </div>
+          </div>
+
+          {/* NUTRITION PROGRESS BARS */}
+          <div className="glassPanel" style={{ padding: "20px 24px", marginBottom: 24 }}>
+            <h3 style={{ fontSize: "16px", marginBottom: "16px", display: "flex", alignItems: "center", gap: 8 }}>
+              <Apple size={18} style={{ color: "var(--accent-gold)" }} /> Today's Macro Goals ({todayDateStr})
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: 6 }}>
+                  <span>🔥 Calories Target ({todayNutr.calories} / {targetCal} kcal)</span>
+                  <span style={{ fontWeight: 700 }}>{calPct}%</span>
+                </div>
+                <div className="progressBarTrack" style={{ height: 10 }}>
+                  <div className="progressBarFill" style={{ width: calPct + "%", background: calPct > 100 ? "var(--color-danger)" : "var(--accent-gold)" }}></div>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: 6 }}>
+                  <span>🥩 Protein Target ({todayNutr.protein} / {targetProtein}g)</span>
+                  <span style={{ fontWeight: 700 }}>{protPct}%</span>
+                </div>
+                <div className="progressBarTrack" style={{ height: 10 }}>
+                  <div className="progressBarFill" style={{ width: protPct + "%", background: "var(--color-success)" }}></div>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: 6 }}>
+                  <span>💧 Water Intake ({todayNutr.water} / {targetWater} L)</span>
+                  <span style={{ fontWeight: 700 }}>{waterPct}%</span>
+                </div>
+                <div className="progressBarTrack" style={{ height: 10 }}>
+                  <div className="progressBarFill" style={{ width: waterPct + "%", background: "var(--color-blue)" }}></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* NUTRITION LOG HISTORY */}
+          {nutrition.length === 0 ? (
+            <div className="emptyStateCard glassPanel">
+              <Apple size={36} className="goldAccentIcon" />
+              <h3>No nutrition logs found</h3>
+              <p>Log your daily calories, protein, and water intake to stay accountable.</p>
+              <button className="primaryBtn" onClick={() => onOpenNutritionModal({ isNew: true })} style={{ marginTop: 12 }}>
+                + Log Daily Nutrition
+              </button>
+            </div>
+          ) : (
+            <div className="duesGrid">
+              {nutrition.map((n) => (
+                <div key={n.id} className="dueCard">
+                  <div className="dueHeader">
+                    <div>
+                      <span className="duePersonName">🥗 {n.date}</span>
+                      <div className="dueBadgesRow">
+                        <span className="dueTypeTag lent">{n.calories} kcal</span>
+                        <span className="dueTypeTag owed">{n.protein}g Protein</span>
+                      </div>
+                    </div>
+                    <div className="dueActionBtns">
+                      <button className="iconBtn small" onClick={() => onOpenNutritionModal({ isNew: false, item: n })}>
+                        <Pencil size={14} />
+                      </button>
+                      <button className="iconBtn small dangerHover" onClick={() => onDeleteNutrition(n.id)}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="dueAmountBlock">
+                    <div className="amountCol">
+                      <small>Carbs</small>
+                      <strong>{n.carbs || 0}g</strong>
+                    </div>
+                    <div className="amountCol">
+                      <small>Fats</small>
+                      <strong>{n.fat || 0}g</strong>
+                    </div>
+                    <div className="amountCol remaining">
+                      <small>Water</small>
+                      <strong>{n.water || 0} L</strong>
+                    </div>
+                  </div>
+
+                  {n.notes && (
+                    <div className="dueReasonBlock">
+                      <strong>Notes:</strong> {n.notes}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* WORKOUTS TAB CONTENT */}
+      {subTab === "workouts" && (
+        <div className="space-y-6">
+          {workouts.length === 0 ? (
+            <div className="emptyStateCard glassPanel">
+              <Activity size={36} className="goldAccentIcon" />
+              <h3>No workouts logged yet</h3>
+              <p>Record your strength sessions, cardio, and athletic workouts.</p>
+              <button className="primaryBtn" onClick={() => onOpenWorkoutModal({ isNew: true })} style={{ marginTop: 12 }}>
+                + Log First Workout
+              </button>
+            </div>
+          ) : (
+            <div className="duesGrid">
+              {workouts.map((w) => (
+                <div key={w.id} className="dueCard">
+                  <div className="dueHeader">
+                    <div>
+                      <span className="duePersonName">🏋️ {w.title}</span>
+                      <div className="dueBadgesRow">
+                        <span className="dueTypeTag lent">{w.category || "General"}</span>
+                        {w.duration ? <span className="statusPill pending">⏱️ {w.duration} mins</span> : null}
+                      </div>
+                    </div>
+                    <div className="dueActionBtns">
+                      <button className="iconBtn small" onClick={() => onOpenWorkoutModal({ isNew: false, item: w })}>
+                        <Pencil size={14} />
+                      </button>
+                      <button className="iconBtn small dangerHover" onClick={() => onDeleteWorkout(w.id)}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="dueDatesRow">
+                    <span>Date: {w.date}</span>
+                    {w.calories_burned ? <span>🔥 Burned: {w.calories_burned} kcal</span> : null}
+                  </div>
+
+                  {w.notes && (
+                    <div className="dueReasonBlock">
+                      <strong>Notes:</strong> {w.notes}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </main>
+  );
+}
+
+// WEIGHT MODAL
+function WeightModal({ modalData, onClose, onSave }) {
+  const item = modalData.item || {};
+  const [weight, setWeight] = useState(item.weight !== undefined ? item.weight : "");
+  const [bodyFat, setBodyFat] = useState(item.body_fat !== undefined ? item.body_fat : "");
+  const [date, setDate] = useState(item.date || todayStr());
+  const [notes, setNotes] = useState(item.notes || "");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const w = parseFloat(weight);
+    if (isNaN(w) || w <= 0) {
+      alert("Please enter a valid body weight.");
+      return;
+    }
+    onSave({
+      isNew: modalData.isNew,
+      id: item.id,
+      weight: w,
+      body_fat: bodyFat ? parseFloat(bodyFat) : null,
+      date,
+      notes: notes.trim()
+    });
+  };
+
+  return (
+    <div className="modalBackdrop">
+      <div className="modalCard glassPanel">
+        <div className="modalHeader">
+          <h3>{modalData.isNew ? "Log Bodyweight Entry ⚖️" : "Edit Weight Entry"}</h3>
+          <button className="iconBtn small" onClick={onClose}><X size={16} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="modalForm">
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Weight (kg) *</label>
+              <input
+                type="number"
+                step="0.1"
+                required
+                value={weight}
+                onChange={e => setWeight(e.target.value)}
+                placeholder="e.g. 74.5"
+              />
+            </div>
+            <div className="formGroup">
+              <label>Body Fat % (Optional)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={bodyFat}
+                onChange={e => setBodyFat(e.target.value)}
+                placeholder="e.g. 15.2"
+              />
+            </div>
+          </div>
+
+          <div className="formGroup">
+            <label>Date</label>
+            <input
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+            />
+          </div>
+
+          <div className="formGroup">
+            <label>Notes (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="e.g. Fasted morning weight..."
+              rows={2}
+            />
+          </div>
+
+          <div className="modalFooter">
+            <button type="button" className="secondaryBtn" onClick={onClose}>Cancel</button>
+            <button type="submit" className="primaryBtn">Save Entry</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// NUTRITION MODAL
+function NutritionModal({ modalData, onClose, onSave }) {
+  const item = modalData.item || {};
+  const [calories, setCalories] = useState(item.calories !== undefined ? item.calories : "");
+  const [protein, setProtein] = useState(item.protein !== undefined ? item.protein : "");
+  const [carbs, setCarbs] = useState(item.carbs !== undefined ? item.carbs : "");
+  const [fat, setFat] = useState(item.fat !== undefined ? item.fat : "");
+  const [water, setWater] = useState(item.water !== undefined ? item.water : "2.5");
+  const [date, setDate] = useState(item.date || todayStr());
+  const [notes, setNotes] = useState(item.notes || "");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave({
+      isNew: modalData.isNew,
+      id: item.id,
+      calories: parseInt(calories, 10) || 0,
+      protein: parseInt(protein, 10) || 0,
+      carbs: parseInt(carbs, 10) || 0,
+      fat: parseInt(fat, 10) || 0,
+      water: parseFloat(water) || 0,
+      date,
+      notes: notes.trim()
+    });
+  };
+
+  return (
+    <div className="modalBackdrop">
+      <div className="modalCard glassPanel">
+        <div className="modalHeader">
+          <h3>{modalData.isNew ? "Log Daily Nutrition 🥗" : "Edit Nutrition Entry"}</h3>
+          <button className="iconBtn small" onClick={onClose}><X size={16} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="modalForm">
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Calories (kcal) *</label>
+              <input
+                type="number"
+                required
+                value={calories}
+                onChange={e => setCalories(e.target.value)}
+                placeholder="e.g. 2100"
+              />
+            </div>
+            <div className="formGroup">
+              <label>Protein (grams) *</label>
+              <input
+                type="number"
+                required
+                value={protein}
+                onChange={e => setProtein(e.target.value)}
+                placeholder="e.g. 150"
+              />
+            </div>
+          </div>
+
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Carbs (g)</label>
+              <input
+                type="number"
+                value={carbs}
+                onChange={e => setCarbs(e.target.value)}
+                placeholder="e.g. 220"
+              />
+            </div>
+            <div className="formGroup">
+              <label>Fat (g)</label>
+              <input
+                type="number"
+                value={fat}
+                onChange={e => setFat(e.target.value)}
+                placeholder="e.g. 60"
+              />
+            </div>
+          </div>
+
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Water Intake (Liters)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={water}
+                onChange={e => setWater(e.target.value)}
+                placeholder="e.g. 3.0"
+              />
+            </div>
+            <div className="formGroup">
+              <label>Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="formGroup">
+            <label>Notes (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="e.g. High protein meal prep..."
+              rows={2}
+            />
+          </div>
+
+          <div className="modalFooter">
+            <button type="button" className="secondaryBtn" onClick={onClose}>Cancel</button>
+            <button type="submit" className="primaryBtn">Save Entry</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// WORKOUT MODAL
+function WorkoutModal({ modalData, onClose, onSave }) {
+  const item = modalData.item || {};
+  const [title, setTitle] = useState(item.title || "");
+  const [category, setCategory] = useState(item.category || "Strength");
+  const [duration, setDuration] = useState(item.duration !== undefined ? item.duration : "");
+  const [caloriesBurned, setCaloriesBurned] = useState(item.calories_burned !== undefined ? item.calories_burned : "");
+  const [date, setDate] = useState(item.date || todayStr());
+  const [notes, setNotes] = useState(item.notes || "");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title.trim()) {
+      alert("Workout title is required.");
+      return;
+    }
+    onSave({
+      isNew: modalData.isNew,
+      id: item.id,
+      title: title.trim(),
+      category,
+      duration: duration ? parseInt(duration, 10) : 0,
+      calories_burned: caloriesBurned ? parseInt(caloriesBurned, 10) : 0,
+      date,
+      notes: notes.trim()
+    });
+  };
+
+  return (
+    <div className="modalBackdrop">
+      <div className="modalCard glassPanel">
+        <div className="modalHeader">
+          <h3>{modalData.isNew ? "Log Workout Session 🏋️" : "Edit Workout Entry"}</h3>
+          <button className="iconBtn small" onClick={onClose}><X size={16} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="modalForm">
+          <div className="formGroup">
+            <label>Workout Title / Focus *</label>
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="e.g. Push Workout (Chest/Shoulders/Triceps) or 5km Run"
+            />
+          </div>
+
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Category</label>
+              <select value={category} onChange={e => setCategory(e.target.value)} className="selectInput">
+                <option value="Strength">Strength / Hypertrophy</option>
+                <option value="Cardio">Cardio / Running</option>
+                <option value="HIIT">HIIT / CrossFit</option>
+                <option value="Flexibility">Yoga / Flexibility</option>
+                <option value="Sports">Sports / Basketball</option>
+              </select>
+            </div>
+            <div className="formGroup">
+              <label>Duration (Minutes)</label>
+              <input
+                type="number"
+                value={duration}
+                onChange={e => setDuration(e.target.value)}
+                placeholder="e.g. 60"
+              />
+            </div>
+          </div>
+
+          <div className="formRowGrid">
+            <div className="formGroup">
+              <label>Calories Burned (kcal)</label>
+              <input
+                type="number"
+                value={caloriesBurned}
+                onChange={e => setCaloriesBurned(e.target.value)}
+                placeholder="e.g. 450"
+              />
+            </div>
+            <div className="formGroup">
+              <label>Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="formGroup">
+            <label>Notes / Exercises Logged (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="e.g. Bench Press 80kg 4x8, Overhead Press 50kg 3x10..."
+              rows={3}
+            />
+          </div>
+
+          <div className="modalFooter">
+            <button type="button" className="secondaryBtn" onClick={onClose}>Cancel</button>
+            <button type="submit" className="primaryBtn">Save Workout</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+createRoot(document.getElementById("root")).render(<ErrorBoundary><App /></ErrorBoundary>);
 
 
 function DuesView({ dues, subTab, setSubTab, setLocal, onOpenDueModal, onDeleteDue }) {
