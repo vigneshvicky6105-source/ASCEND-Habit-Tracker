@@ -20,7 +20,11 @@ const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUP
 
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function starterQuestUuidForKey(starterKey) {
@@ -654,13 +658,13 @@ function App() {
           return { user_id: uid, task_id, completed_on };
         })
         .filter(row => uuidRegex.test(row.task_id));
-
       if (completionRows.length > 0) {
         const { error: compUpsertErr } = await supabase.from("task_completions").upsert(completionRows, {
           onConflict: "user_id,task_id,completed_on"
         });
         if (compUpsertErr) console.warn("Supabase completions upsert error:", compUpsertErr);
       }
+
       // 3. Books Sync
       if ((local.books || []).length > 0) {
         await supabase.from("books").upsert(
@@ -720,6 +724,24 @@ function App() {
           }))
         );
       }
+
+      // 6. Daily Focus Sync
+      const { data: cloudFocus } = await supabase.from("daily_focus").select("*").eq("user_id", uid);
+      if (cloudFocus && cloudFocus.length > 0) {
+        const mergedFocus = { ...(local.daily_focus || {}) };
+        cloudFocus.forEach(df => {
+          if (df.focus_date && df.goal) {
+            mergedFocus[df.focus_date] = df.goal;
+          }
+        });
+        setLocal(s => ({ ...s, daily_focus: mergedFocus }));
+      }
+      const focusRows = Object.keys(local.daily_focus || {})
+        .filter(d => local.daily_focus[d])
+        .map(d => ({ user_id: uid, focus_date: d, goal: local.daily_focus[d] }));
+      if (focusRows.length > 0) {
+        await supabase.from("daily_focus").upsert(focusRows, { onConflict: "user_id,focus_date" });
+      }
     } catch (err) {
       console.warn("Cloud sync deferred:", err);
     } finally {
@@ -733,7 +755,7 @@ function App() {
       const timer = setTimeout(() => syncWithCloud(), 3000);
       return () => clearTimeout(timer);
     }
-  }, [user, online, localReady, local.tasks, local.completions, local.books, local.wishlist, local.side_quests]);
+  }, [user, online, localReady, local.tasks, local.completions, local.books, local.wishlist, local.side_quests, local.daily_focus]);
 
   // Auth Handlers
   async function handleGoogleLogin() {
@@ -753,7 +775,7 @@ function App() {
   }
 
   // --- QUEST ACTIONS ---
-  
+
   const saveDue = (dueData) => {
     setLocal(s => {
       const list = [...(s.dues || [])];
@@ -809,13 +831,41 @@ function App() {
       .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   }, [local.tasks]);
 
-  const toggleTaskCompletion = (task) => {
+  const toggleTaskCompletion = async (task) => {
     const key = `${task.id}:${todayStr()}`;
+    const willBeCompleted = !local.completions[key];
     setLocal(s => {
       const completions = { ...s.completions };
-      completions[key] = !completions[key];
+      if (willBeCompleted) {
+        completions[key] = true;
+      } else {
+        delete completions[key];
+      }
       return { ...s, completions };
     });
+
+    if (supabase && user && online) {
+      const completed_on = todayStr();
+      if (willBeCompleted) {
+        const { error } = await supabase.from("task_completions").upsert([{
+          user_id: user.id,
+          task_id: task.id,
+          completed_on
+        }], { onConflict: "user_id,task_id,completed_on" });
+        if (error) {
+          console.warn("Supabase completion save error:", error);
+        }
+      } else {
+        const { error } = await supabase.from("task_completions").delete().match({
+          user_id: user.id,
+          task_id: task.id,
+          completed_on
+        });
+        if (error) {
+          console.warn("Supabase completion delete error:", error);
+        }
+      }
+    }
   };
 
   const toggleTaskLock = (task) => {
@@ -931,7 +981,6 @@ function App() {
     }
   };
 
-  // --- SIDE QUEST ACTIONS ---
   const saveSideQuestModal = (sqData) => {
     if (sqData.isNew) {
       const newSq = {
