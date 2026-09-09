@@ -556,48 +556,111 @@ function App() {
     try {
       const uid = user.id;
 
-      // 1. Fetch Cloud Tasks
-      const { data: cloudTasks } = await supabase.from("tasks").select("*").eq("user_id", uid);
+      // 1. Fetch Cloud Tasks & Automated Deduplication
+      const { data: cloudTasks, error: taskErr } = await supabase.from("tasks").select("*").eq("user_id", uid);
+      if (taskErr) console.warn("Supabase tasks fetch error:", taskErr);
+
       if (cloudTasks && cloudTasks.length > 0) {
-        // Merge strategy: map local & cloud tasks by id
+        const canonicalTasksMap = new Map();
+        const duplicateTaskIdsToDelete = [];
+
+        cloudTasks.forEach(ct => {
+          const key = ct.starter_key || ct.title;
+          if (!canonicalTasksMap.has(key)) {
+            canonicalTasksMap.set(key, ct);
+          } else {
+            const existing = canonicalTasksMap.get(key);
+            const expectedUuid = ct.starter_key ? starterQuestUuidForKey(ct.starter_key) : null;
+            
+            if (expectedUuid && ct.id === expectedUuid && existing.id !== expectedUuid) {
+              duplicateTaskIdsToDelete.push(existing.id);
+              canonicalTasksMap.set(key, ct);
+            } else {
+              duplicateTaskIdsToDelete.push(ct.id);
+            }
+          }
+        });
+
+        // Clean up duplicate tasks from Supabase cloud database
+        if (duplicateTaskIdsToDelete.length > 0) {
+          console.log(`Deduplicating ${duplicateTaskIdsToDelete.length} duplicate cloud tasks for user ${uid}`);
+          await supabase.from("tasks").delete().in("id", duplicateTaskIdsToDelete);
+        }
+
+        const deduplicatedCloudTasks = Array.from(canonicalTasksMap.values());
+
+        // Merge deduplicated cloud tasks with local tasks
         const mergedMap = new Map();
-        local.tasks.forEach(t => mergedMap.set(t.id, t));
-        cloudTasks.forEach(ct => mergedMap.set(ct.id, ct));
+        local.tasks.forEach(t => {
+          const key = t.starter_key || t.title;
+          mergedMap.set(key, t);
+        });
+        deduplicatedCloudTasks.forEach(ct => {
+          const key = ct.starter_key || ct.title;
+          mergedMap.set(key, ct);
+        });
         const mergedTasks = Array.from(mergedMap.values());
         setLocal(s => ({ ...s, tasks: mergedTasks }));
       }
-      
-      // Upsert current local tasks to Supabase
+
+      // Upsert local tasks to Supabase with valid UUIDs
       if (local.tasks.length > 0) {
-        await supabase.from("tasks").upsert(
-          local.tasks.map(t => ({
-            id: t.id.startsWith("starter-") ? undefined : t.id,
+        const validTaskUpserts = local.tasks
+          .filter(t => t.id && !t.id.startsWith("starter-"))
+          .map(t => ({
+            id: t.id,
+            starter_key: t.starter_key || null,
             user_id: uid,
             title: t.title,
-            category: t.category,
+            category: t.category || "General",
             target: t.target || "",
             xp: t.xp || 10,
             locked: !!t.locked,
             active: t.active !== false,
             sort_order: t.sort_order || 0
-          })),
-          { onConflict: "id" }
-        );
+          }));
+        
+        if (validTaskUpserts.length > 0) {
+          const { error: upsertErr } = await supabase.from("tasks").upsert(validTaskUpserts, { onConflict: "id" });
+          if (upsertErr) console.warn("Supabase tasks upsert error:", upsertErr);
+        }
       }
 
-      // 2. Task Completions Sync
-      const completionRows = Object.keys(local.completions || {})
-        .filter(k => local.completions[k])
+      // 2. Task Completions Bidirectional Sync
+      const { data: cloudCompletions, error: compFetchErr } = await supabase
+        .from("task_completions")
+        .select("*")
+        .eq("user_id", uid);
+      
+      if (compFetchErr) console.warn("Supabase task_completions fetch error:", compFetchErr);
+
+      const mergedCompletions = { ...(local.completions || {}) };
+
+      if (cloudCompletions && cloudCompletions.length > 0) {
+        cloudCompletions.forEach(cc => {
+          if (cc.task_id && cc.completed_on) {
+            mergedCompletions[`${cc.task_id}:${cc.completed_on}`] = true;
+          }
+        });
+        setLocal(s => ({ ...s, completions: mergedCompletions }));
+      }
+
+      // Push local completions to Supabase
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const completionRows = Object.keys(mergedCompletions)
+        .filter(k => mergedCompletions[k])
         .map(k => {
           const [task_id, completed_on] = k.split(":");
           return { user_id: uid, task_id, completed_on };
-        });
+        })
+        .filter(row => uuidRegex.test(row.task_id));
+
       if (completionRows.length > 0) {
-        await supabase.from("task_completions").upsert(completionRows, {
+        const { error: compUpsertErr } = await supabase.from("task_completions").upsert(completionRows, {
           onConflict: "user_id,task_id,completed_on"
         });
+        if (compUpsertErr) console.warn("Supabase completions upsert error:", compUpsertErr);
       }
-
       // 3. Books Sync
       if ((local.books || []).length > 0) {
         await supabase.from("books").upsert(
