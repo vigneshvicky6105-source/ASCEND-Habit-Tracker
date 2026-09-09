@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
 import {
   Check, Flame, Plus, Settings, BookOpen, LogIn, LogOut, WifiOff, Cloud, Dumbbell, Activity, Scale, Apple, Droplets,
   Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpRight, ArrowDownLeft, Lock, Unlock, Calendar, Trophy,
   BarChart2, Sparkles, X, ChevronRight, RefreshCw, ShoppingCart, Target, Wallet,
-  Layers, CheckCircle2, Circle, Swords, Shield, Clock, CalendarDays, Bell, BellOff
+  Layers, CheckCircle2, Circle, Swords, Shield, Clock, CalendarDays, Bell, BellOff, User, Home, Award, Compass, MessageSquare
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart,
@@ -23,21 +23,33 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function starterQuestUuidForKey(starterKey) {
+  let hash = 0;
+  for (let i = 0; i < starterKey.length; i++) {
+    hash = (hash * 31 + starterKey.charCodeAt(i)) % 1000000007;
+  }
+  const hex = Math.abs(hash).toString(16).padStart(12, '0');
+  return `00000000-0000-4000-8000-${hex.slice(0, 12)}`;
+}
+
 // --- DEFAULT STARTER DATA ---
-const STARTER_QUESTS = [
-  { title: "LeetCode + GeeksforGeeks", category: "Coding", target: "1 problem", xp: 10, locked: true },
-  { title: "Check Mail", category: "Career/Admin", target: "1 check", xp: 5, locked: true },
-  { title: "IT Learning", category: "Learning", target: "1 lesson", xp: 10, locked: false },
-  { title: "Apply for Jobs — Naukri + Indeed", category: "Career", target: "1+ application", xp: 15, locked: true },
-  { title: "Read 10 Pages", category: "Reading", target: "10 pages", xp: 10, locked: true },
-  { title: "Post on LinkedIn", category: "Career/Brand", target: "1 post", xp: 8, locked: false },
-  { title: "Create + Post Brainrot Videos", category: "Content", target: "1 video", xp: 10, locked: false },
-  { title: "Core Concept Learning", category: "Learning", target: "1 concept", xp: 10, locked: true },
-  { title: "Python Brush-Up", category: "Coding", target: "30 min", xp: 10, locked: true },
-  { title: "Drink 5L Water", category: "Health", target: "5 L", xp: 5, locked: true },
-  { title: "Record Yourself Explaining a Topic", category: "Communication", target: "1 video", xp: 10, locked: false },
-  { title: "Run 5 KM", category: "Fitness", target: "5 KM", xp: 7, locked: false }
+const STARTER_QUESTS_TEMPLATE = [
+  { starter_key: "starter-leetcode", title: "LeetCode + GeeksforGeeks", category: "Coding", target: "1 problem", xp: 10, locked: true },
+  { starter_key: "starter-check-mail", title: "Check Mail", category: "Career/Admin", target: "1 check", xp: 5, locked: true },
+  { starter_key: "starter-it-learning", title: "IT Learning", category: "Learning", target: "1 lesson", xp: 10, locked: false },
+  { starter_key: "starter-job-apply", title: "Apply for Jobs — Naukri + Indeed", category: "Career", target: "1+ application", xp: 15, locked: true },
+  { starter_key: "starter-read-10-pages", title: "Read 10 Pages", category: "Reading", target: "10 pages", xp: 10, locked: true },
+  { starter_key: "starter-linkedin", title: "Post on LinkedIn", category: "Career/Brand", target: "1 post", xp: 8, locked: false },
+  { starter_key: "starter-brainrot-videos", title: "Create + Post Brainrot Videos", category: "Content", target: "1 video", xp: 10, locked: false },
+  { starter_key: "starter-core-concepts", title: "Core Concept Learning", category: "Learning", target: "1 concept", xp: 10, locked: true },
+  { starter_key: "starter-python", title: "Python Brush-Up", category: "Coding", target: "30 min", xp: 10, locked: true },
+  { starter_key: "starter-drink-water", title: "Drink 5L Water", category: "Health", target: "5 L", xp: 5, locked: true },
+  { starter_key: "starter-explain-topic", title: "Record Yourself Explaining a Topic", category: "Communication", target: "1 video", xp: 10, locked: false },
+  { starter_key: "starter-run-5km", title: "Run 5 KM or 50K Steps", category: "Fitness", target: "5 KM / 50K steps", xp: 7, locked: false },
+  { starter_key: "starter-hit-gym", title: "Hit the Gym", category: "Fitness", target: "1 session", xp: 10, locked: false }
 ];
+
+const STARTER_QUESTS = STARTER_QUESTS_TEMPLATE;
 
 const STARTER_CONCEPTS = [
   { title: "Python", subtitle: "Daily learning target" },
@@ -102,7 +114,7 @@ function getLevelRankTitle(level) {
 // --- INDEXEDDB MULTI-USER ISOLATED STORAGE ---
 const DB_NAME = "project_ascend_v4_db";
 const DB_VERSION = 6;
-const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus", "dues", "fitness"];
+const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus", "dues", "fitness", "pending_mutations"];
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -494,7 +506,8 @@ function App() {
 
   const [dueModal, setDueModal] = useState(null); // null | { isNew: bool, due?: obj, defaultType?: string }
   const [duesSubTab, setDuesSubTab] = useState("lent"); // "lent" | "owed"
-  const [questSubTab, setQuestSubTab] = useState("main"); // "main" | "side"
+  const [questSubTab, setQuestSubTab] = useState("main");
+  const [progressSubTab, setProgressSubTab] = useState("analytics"); // "main" | "side"
   const [notifPermission, setNotifPermission] = useState(() => {
     try {
       return (typeof window !== "undefined" && "Notification" in window) ? Notification.permission : "default";
@@ -1166,34 +1179,51 @@ function App() {
         </div>
       </header>
 
-      {/* NAVIGATION TABS */}
-      <nav className="navTabs">
-        {[
-          { id: "dashboard", label: "Dashboard", icon: <Trophy size={16} /> },
-          { id: "quests", label: "Quests Center ⚔️", icon: <Swords size={16} /> },
-          { id: "reading", label: "Reading Center", icon: <BookOpen size={16} /> },
-          { id: "wishlist", label: "Wishlist", icon: <ShoppingCart size={16} /> },
-          { id: "dues", label: "Dues Tracker 💸", icon: <Wallet size={16} /> },
-          { id: "fitness", label: "Fitness & Health 🏋️", icon: <Dumbbell size={16} /> },
-          { id: "analytics", label: "Analytics & Insights", icon: <BarChart2 size={16} /> },
-          { id: "ai", label: "Ascend AI 🤖", icon: <Sparkles size={16} /> },
-          { id: "achievements", label: "Achievements 🏆", icon: <Trophy size={16} /> },
-          { id: "ascension", label: "Ascension 🗺️", icon: <Target size={16} /> },
-          { id: "settings", label: "Settings", icon: <Settings size={16} /> }
-        ].map(t => (
-          <button
-            key={t.id}
-            className={`navTabBtn ${tab === t.id ? "active" : ""}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.icon}
-            <span>{t.label}</span>
-          </button>
-        ))}
+      {/* BOTTOM NAVIGATION BAR */}
+      <nav className="bottomNav">
+        <button
+          className={`bottomNavItem ${tab === "dashboard" || tab === "home" ? "active" : ""}`}
+          onClick={() => setTab("dashboard")}
+        >
+          <Home size={20} />
+          <span>Home</span>
+        </button>
+
+        <button
+          className={`bottomNavItem ${tab === "quests" ? "active" : ""}`}
+          onClick={() => setTab("quests")}
+        >
+          <Swords size={20} />
+          <span>Quests</span>
+        </button>
+
+        <button
+          className={`bottomNavItem ${tab === "progress" || tab === "analytics" ? "active" : ""}`}
+          onClick={() => setTab("progress")}
+        >
+          <BarChart2 size={20} />
+          <span>Progress</span>
+        </button>
+
+        <button
+          className={`bottomNavItem ${tab === "ai" ? "active" : ""}`}
+          onClick={() => setTab("ai")}
+        >
+          <Sparkles size={20} />
+          <span>AI</span>
+        </button>
+
+        <button
+          className={`bottomNavItem ${tab === "profile" || tab === "settings" ? "active" : ""}`}
+          onClick={() => setTab("profile")}
+        >
+          <User size={20} />
+          <span>Profile</span>
+        </button>
       </nav>
 
       {/* MAIN CONTAINER CONTENT */}
-      {tab === "dashboard" && (
+      {(tab === "dashboard" || tab === "home") && (
         <DashboardView
           tasks={activeTasks}
           local={local}
@@ -1207,7 +1237,16 @@ function App() {
           totalXpAllTime={totalXpAllTime}
           streakStats={streakStats}
           logReadingTenPages={logReadingTenPages}
-          onNavigate={setTab}
+          onNavigate={(t) => {
+            if (t === "reading") { setTab("quests"); setQuestSubTab("reading"); }
+            else if (t === "wishlist") { setTab("quests"); setQuestSubTab("wishlist"); }
+            else if (t === "dues") { setTab("progress"); setProgressSubTab("dues"); }
+            else if (t === "fitness") { setTab("progress"); setProgressSubTab("fitness"); }
+            else if (t === "achievements") { setTab("progress"); setProgressSubTab("achievements"); }
+            else if (t === "ascension") { setTab("progress"); setProgressSubTab("ascension"); }
+            else if (t === "settings") { setTab("profile"); }
+            else setTab(t);
+          }}
           sideQuests={local.side_quests || []}
           toggleSideQuestCompletion={toggleSideQuestCompletion}
           onOpenSideQuestModal={setSideQuestModal}
@@ -1234,23 +1273,114 @@ function App() {
           onDeleteSideQuest={deleteSideQuest}
           notifPermission={notifPermission}
           requestNotificationPermission={requestNotificationPermission}
+          books={local.books}
+          wishlist={local.wishlist}
+          setLocal={setLocal}
+          onOpenBookModal={setBookModal}
+          onOpenWishlistModal={setWishlistModal}
+          logReadingTenPages={logReadingTenPages}
         />
       )}
 
-      {tab === "achievements" && (
-        <AchievementsView
-          local={local}
-          streakStats={streakStats}
-          totalXpAllTime={totalXpAllTime}
-          currentLevel={currentLevel}
-        />
-      )}
+      {(tab === "progress" || tab === "analytics") && (
+        <main className="viewContainer fade-in">
+          {/* PROGRESS SUB-TAB NAVIGATION PILLS */}
+          <div className="subTabPills" style={{ marginBottom: "20px" }}>
+            <button
+              className={`subTabPill ${progressSubTab === "analytics" ? "active" : ""}`}
+              onClick={() => setProgressSubTab("analytics")}
+            >
+              📊 Analytics
+            </button>
+            <button
+              className={`subTabPill ${progressSubTab === "ascension" ? "active" : ""}`}
+              onClick={() => setProgressSubTab("ascension")}
+            >
+              🗺️ Ascension
+            </button>
+            <button
+              className={`subTabPill ${progressSubTab === "achievements" ? "active" : ""}`}
+              onClick={() => setProgressSubTab("achievements")}
+            >
+              🏆 Achievements
+            </button>
+            <button
+              className={`subTabPill ${progressSubTab === "dues" ? "active" : ""}`}
+              onClick={() => setProgressSubTab("dues")}
+            >
+              💸 Dues
+            </button>
+            <button
+              className={`subTabPill ${progressSubTab === "fitness" ? "active" : ""}`}
+              onClick={() => setProgressSubTab("fitness")}
+            >
+              🏋️ Fitness
+            </button>
+            <button
+              className={`subTabPill ${progressSubTab === "history" ? "active" : ""}`}
+              onClick={() => setProgressSubTab("history")}
+            >
+              📅 History
+            </button>
+          </div>
 
-      {tab === "ascension" && (
-        <AscensionJourneyView
-          currentLevel={currentLevel}
-          totalXpAllTime={totalXpAllTime}
-        />
+          {progressSubTab === "analytics" && (
+            <AnalyticsView
+              local={local}
+              tasks={activeTasks}
+              streakStats={streakStats}
+              totalXpAllTime={totalXpAllTime}
+            />
+          )}
+
+          {progressSubTab === "ascension" && (
+            <AscensionJourneyView
+              currentLevel={currentLevel}
+              totalXpAllTime={totalXpAllTime}
+            />
+          )}
+
+          {progressSubTab === "achievements" && (
+            <AchievementsView
+              local={local}
+              streakStats={streakStats}
+              totalXpAllTime={totalXpAllTime}
+              currentLevel={currentLevel}
+            />
+          )}
+
+          {progressSubTab === "dues" && (
+            <DuesView
+              dues={local.dues || []}
+              subTab={duesSubTab}
+              setSubTab={setDuesSubTab}
+              setLocal={setLocal}
+              onOpenDueModal={setDueModal}
+              onDeleteDue={deleteDue}
+            />
+          )}
+
+          {progressSubTab === "fitness" && (
+            <FitnessView
+              fitness={local.fitness || { weights: [], nutrition: [], workouts: [] }}
+              subTab={fitnessSubTab}
+              setSubTab={setFitnessSubTab}
+              onOpenWeightModal={setWeightModal}
+              onDeleteWeight={deleteWeightEntry}
+              onOpenNutritionModal={setNutritionModal}
+              onDeleteNutrition={deleteNutritionEntry}
+              onOpenWorkoutModal={setWorkoutModal}
+              onDeleteWorkout={deleteWorkoutEntry}
+            />
+          )}
+
+          {progressSubTab === "history" && (
+            <HistoryView
+              local={local}
+              recoverSideQuest={recoverSideQuest}
+            />
+          )}
+        </main>
       )}
 
       {tab === "ai" && (
@@ -1261,66 +1391,22 @@ function App() {
           totalXpAllTime={totalXpAllTime}
           geminiKey={geminiKey}
           setGeminiKey={setGeminiKey}
-          onNavigate={setTab}
+          onNavigate={(t) => {
+            if (t === "reading") { setTab("quests"); setQuestSubTab("reading"); }
+            else if (t === "wishlist") { setTab("quests"); setQuestSubTab("wishlist"); }
+            else if (t === "dues") { setTab("progress"); setProgressSubTab("dues"); }
+            else if (t === "fitness") { setTab("progress"); setProgressSubTab("fitness"); }
+            else if (t === "achievements") { setTab("progress"); setProgressSubTab("achievements"); }
+            else if (t === "ascension") { setTab("progress"); setProgressSubTab("ascension"); }
+            else if (t === "settings") { setTab("profile"); }
+            else setTab(t);
+          }}
           onOpenSideQuestModal={setSideQuestModal}
         />
       )}
 
-      {tab === "reading" && (
-        <ReadingView
-          books={local.books}
-          setLocal={setLocal}
-          onOpenBookModal={setBookModal}
-          logReadingTenPages={logReadingTenPages}
-        />
-      )}
-
-      {tab === "wishlist" && (
-        <WishlistView
-          wishlist={local.wishlist}
-          setLocal={setLocal}
-          onOpenWishlistModal={setWishlistModal}
-        />
-      )}
-
-      
-      {tab === "dues" && (
-        <DuesView
-          dues={local.dues || []}
-          subTab={duesSubTab}
-          setSubTab={setDuesSubTab}
-          setLocal={setLocal}
-          onOpenDueModal={setDueModal}
-          onDeleteDue={deleteDue}
-        />
-      )}
-
-      
-      {tab === "fitness" && (
-        <FitnessView
-          fitness={local.fitness || { weights: [], nutrition: [], workouts: [] }}
-          subTab={fitnessSubTab}
-          setSubTab={setFitnessSubTab}
-          onOpenWeightModal={setWeightModal}
-          onDeleteWeight={deleteWeightEntry}
-          onOpenNutritionModal={setNutritionModal}
-          onDeleteNutrition={deleteNutritionEntry}
-          onOpenWorkoutModal={setWorkoutModal}
-          onDeleteWorkout={deleteWorkoutEntry}
-        />
-      )}
-
-      {tab === "analytics" && (
-        <AnalyticsView
-          local={local}
-          tasks={activeTasks}
-          streakStats={streakStats}
-          totalXpAllTime={totalXpAllTime}
-        />
-      )}
-
-      {tab === "settings" && (
-        <SettingsView
+      {(tab === "profile" || tab === "settings") && (
+        <ProfileView
           user={user}
           online={online}
           syncWithCloud={syncWithCloud}
@@ -1331,6 +1417,10 @@ function App() {
           setGeminiKey={setGeminiKey}
           handleGoogleLogin={handleGoogleLogin}
           handleLogout={handleLogout}
+          local={local}
+          currentLevel={currentLevel}
+          totalXpAllTime={totalXpAllTime}
+          streakStats={streakStats}
         />
       )}
 
@@ -1351,8 +1441,6 @@ function App() {
         />
       )}
 
-      
-      
       {weightModal && (
         <WeightModal
           modalData={weightModal}
@@ -1453,23 +1541,7 @@ function App() {
 
       <footer className="appFooter">
         <div className="footerInner">
-          <div className="footerBrandRow">
-            <div className="footerLogoGroup">
-              <img src="/favicon-16.png" alt="Project Ascend Logo" className="footerLogoImg" />
-              <span className="footerBrandName">PROJECT <span>ASCEND</span></span>
-            </div>
-            <span className="footerTagline">A game where your real life is the game.</span>
-          </div>
-
-          <div className="footerMetaRow">
-            <span className="footerPill">⚡ Offline-First PWA</span>
-            <span className="footerPill">🛡️ IndexedDB v4</span>
-            <span className="footerPill">🚀 Vercel Live OS</span>
-          </div>
-
-          <div className="footerCopyright">
-            <span>© {new Date().getFullYear()} PROJECT ASCEND • Personal Productivity RPG</span>
-          </div>
+          <span className="footerTagline">PROJECT ASCEND — "Your life is the game." © {new Date().getFullYear()}</span>
         </div>
       </footer>
     </div>
@@ -3614,103 +3686,161 @@ function ChallengesView({ local, setLocal }) {
 // ==========================================
 // 6. SETTINGS VIEW COMPONENT
 // ==========================================
-function SettingsView({ user, online, syncWithCloud, syncing, notifPermission, requestNotificationPermission, geminiKey, setGeminiKey, handleGoogleLogin, handleLogout }) {
+// ==========================================
+function ProfileView({ user, online, syncWithCloud, syncing, notifPermission, requestNotificationPermission, geminiKey, setGeminiKey, handleGoogleLogin, handleLogout, local, currentLevel, totalXpAllTime, streakStats }) {
+  const rankInfo = getLevelRankTitle(currentLevel);
+  const pendingCount = (local.pending_mutations || []).length;
+
   return (
     <main className="viewContainer fade-in">
       <div className="pageHeaderRow">
         <div>
-          <div className="eyebrowText"><Settings size={13} /> ARCHITECTURE & SYNC</div>
-          <h2 className="pageTitle">SYSTEM SETTINGS</h2>
-          <p className="pageSubtitle">Manage Google OAuth, cloud synchronization, push notifications, AI configuration, and offline storage state.</p>
+          <div className="eyebrowText"><User size={13} /> PERSONAL OPERATING SYSTEM</div>
+          <h2 className="pageTitle">USER PROFILE & SETTINGS</h2>
+          <p className="pageSubtitle">Manage your account, rank progression, AI capabilities, preferences, and cloud backup.</p>
         </div>
       </div>
 
-      <div className="glassPanel">
-        <h3>🔐 User Authentication & Google OAuth</h3>
-        <p className="settingsDesc">
-          {user
-            ? `Signed in as ${user.email}. Your data is automatically backed up and synced to Supabase PostgreSQL.`
-            : "Operating in local guest mode. Sign in with your Google account via Supabase to enable cloud backup and cross-device sync."}
-        </p>
+      <div className="profileContainer">
+        {/* HEADER PROFILE CARD */}
+        <div className="profileHeaderCard">
+          <div className="profileAvatarGroup">
+            <div className="profileAvatar">
+              {user ? (user.email ? user.email.charAt(0).toUpperCase() : "A") : "G"}
+            </div>
+            <div className="profileTitleGroup">
+              <h2>{user ? (user.user_metadata?.full_name || user.email?.split("@")[0] || "Ascendant Hero") : "Guest Ascendant"}</h2>
+              <p>{user ? user.email : "Guest Mode (Local Vault Only)"}</p>
+            </div>
+          </div>
 
-        <div className="settingsActions" style={{ marginTop: 12 }}>
-          {user ? (
-            <button className="secondaryBtn" onClick={handleLogout}>
-              <LogOut size={16} />
-              <span>Sign Out ({user.email})</span>
-            </button>
-          ) : (
-            <button className="primaryBtn" onClick={handleGoogleLogin}>
-              <LogIn size={16} />
-              <span>Sign in with Google Account</span>
-            </button>
-          )}
-
-          {online && user && (
-            <button className="secondaryBtn" onClick={syncWithCloud} disabled={syncing}>
-              <RefreshCw size={16} className={syncing ? "spin" : ""} />
-              <span>{syncing ? "Syncing with Supabase..." : "Force Cloud Sync Now"}</span>
-            </button>
-          )}
+          <div className="profileStatsGroup">
+            <div className="profileStatBox">
+              <div className="val">{rankInfo.icon} {rankInfo.title}</div>
+              <div className="lbl">Current Rank</div>
+            </div>
+            <div className="profileStatBox">
+              <div className="val">Lvl {currentLevel}</div>
+              <div className="lbl">Level</div>
+            </div>
+            <div className="profileStatBox">
+              <div className="val">{totalXpAllTime}</div>
+              <div className="lbl">Total XP</div>
+            </div>
+            <div className="profileStatBox">
+              <div className="val">🔥 {streakStats.currentStreak}d</div>
+              <div className="lbl">Streak</div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="glassPanel marginTop">
-        <h3>🤖 Ascend AI LLM Configuration (Google Gemini API)</h3>
-        <p className="settingsDesc">
-          Ascend AI functions 100% offline out-of-the-box using the built-in RAG assistant engine. Optionally paste your free Google Gemini API Key below to enable full conversational LLM reasoning.
-        </p>
+        {/* PROFILE SECTIONS GRID */}
+        <div className="profileSectionsGrid">
+          {/* SECTION 1: ACCOUNT */}
+          <div className="profileSectionCard">
+            <div className="profileSectionHeader">
+              <User size={18} />
+              <span>Account & Authentication</span>
+            </div>
+            <div className="profileRow">
+              <span className="profileRowLabel">Google Account Status</span>
+              <span className="profileRowValue">{user ? "Connected" : "Disconnected (Guest)"}</span>
+            </div>
+            <div className="profileRow">
+              <span className="profileRowLabel">Email</span>
+              <span className="profileRowValue">{user ? user.email : "N/A"}</span>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              {user ? (
+                <button className="secondaryBtn" onClick={handleLogout} style={{ width: "100%" }}>
+                  <LogOut size={16} />
+                  <span>Sign Out of Account</span>
+                </button>
+              ) : (
+                <button className="primaryBtn" onClick={handleGoogleLogin} style={{ width: "100%" }}>
+                  <LogIn size={16} />
+                  <span>Sign In with Google</span>
+                </button>
+              )}
+            </div>
+          </div>
 
-        <div className="formGroup" style={{ marginTop: 12, maxWidth: 500 }}>
-          <label>Google Gemini API Key (Optional)</label>
-          <input
-            type="password"
-            placeholder="AIzaSy..."
-            value={geminiKey}
-            onChange={(e) => {
-              setGeminiKey(e.target.value);
-              localStorage.setItem("ascend_gemini_api_key", e.target.value.trim());
-            }}
-          />
-          <small className="dimText" style={{ marginTop: 4, display: "block" }}>
-            {geminiKey ? "✅ Gemini API Key Configured" : "💡 Leave blank to use 100% offline RAG assistant engine."}
-          </small>
+          {/* SECTION 2: ASCEND AI */}
+          <div className="profileSectionCard">
+            <div className="profileSectionHeader">
+              <Sparkles size={18} />
+              <span>Ascend AI Assistant</span>
+            </div>
+            <p className="settingsDesc" style={{ margin: 0 }}>
+              Configure your Google Gemini API key to power real-time AI productivity coaching and custom insights.
+            </p>
+            <div className="inputGroup">
+              <label>Gemini API Key</label>
+              <input
+                type="password"
+                placeholder="AIzaSy..."
+                value={geminiKey}
+                onChange={(e) => {
+                  setGeminiKey(e.target.value);
+                  localStorage.setItem("ascend_gemini_api_key", e.target.value);
+                }}
+                className="modalInput"
+              />
+            </div>
+            <small style={{ color: "var(--text-muted)", fontSize: "11px" }}>
+              Key is stored securely in local browser storage and sent directly to Google Gemini APIs.
+            </small>
+          </div>
+
+          {/* SECTION 3: PREFERENCES */}
+          <div className="profileSectionCard">
+            <div className="profileSectionHeader">
+              <Settings size={18} />
+              <span>App Preferences</span>
+            </div>
+            <div className="profileRow">
+              <span className="profileRowLabel">Push Notifications</span>
+              <button
+                className="secondaryBtn"
+                onClick={requestNotificationPermission}
+                disabled={notifPermission === "granted"}
+              >
+                <Bell size={14} />
+                <span>{notifPermission === "granted" ? "Enabled ✅" : "Enable Reminders"}</span>
+              </button>
+            </div>
+            <div className="profileRow">
+              <span className="profileRowLabel">Timezone</span>
+              <span className="profileRowValue">Asia/Kolkata (IST)</span>
+            </div>
+          </div>
+
+          {/* SECTION 4: DATA & CLOUD SYNC */}
+          <div className="profileSectionCard">
+            <div className="profileSectionHeader">
+              <Cloud size={18} />
+              <span>Data & Cloud Sync</span>
+            </div>
+            <div className="profileRow">
+              <span className="profileRowLabel">Cloud Connection</span>
+              <span className="profileRowValue" style={{ color: online ? "var(--color-success)" : "var(--color-danger)" }}>
+                {online ? "Online (Connected)" : "Offline Vault Mode"}
+              </span>
+            </div>
+            <div className="profileRow">
+              <span className="profileRowLabel">Pending Offline Edits</span>
+              <span className="profileRowValue">{pendingCount} pending</span>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              {user && online && (
+                <button className="primaryBtn" onClick={syncWithCloud} disabled={syncing} style={{ width: "100%" }}>
+                  <RefreshCw size={16} className={syncing ? "spin" : ""} />
+                  <span>{syncing ? "Syncing with Supabase..." : "Sync Cloud Now"}</span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-
-      <div className="glassPanel marginTop">
-        <h3>⚔️ Side Quest Push Notifications (10-Min Pre-Due Reminder)</h3>
-        <p className="settingsDesc">
-          Receive web push notifications 10 minutes before any Side Quest is due if it hasn't been completed.
-        </p>
-
-        <div className="settingsActions">
-          <button
-            className={notifPermission === "granted" ? "secondaryBtn" : "primaryBtn"}
-            onClick={requestNotificationPermission}
-          >
-            {notifPermission === "granted" ? <Bell size={16} color="#f5b942" /> : <BellOff size={16} />}
-            <span>
-              {notifPermission === "granted"
-                ? "10m Reminders Active (Click to Test)"
-                : "Enable 10-Min Pre-Due Reminders"}
-            </span>
-          </button>
-        </div>
-      </div>
-
-      <div className="glassPanel marginTop">
-        <h3>Offline & PWA Configuration</h3>
-        <p className="settingsDesc">
-          Project Ascend uses IndexedDB as its primary database. The web app functions 100% offline, caching app shell assets via Service Worker. When internet reconnects, state automatically syncs to your Supabase PostgreSQL cloud tables.
-        </p>
-      </div>
-
-      <div className="glassPanel marginTop">
-        <h3>Offline & PWA Configuration</h3>
-        <p className="settingsDesc">
-          Project Ascend uses IndexedDB as its primary database. The web app functions 100% offline, caching app shell assets via Service Worker. When internet reconnects, state automatically syncs to your Supabase PostgreSQL cloud tables.
-        </p>
       </div>
     </main>
   );
@@ -5141,5 +5271,3 @@ function DueModal({ modalData, onClose, onSave }) {
 }
 
 // --- RENDER APPLICATION ---
-createRoot(document.getElementById("root")).render(<App />);
-
