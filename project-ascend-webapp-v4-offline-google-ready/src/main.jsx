@@ -49,7 +49,11 @@ const STARTER_QUESTS_TEMPLATE = [
   { starter_key: "starter-hit-gym", title: "Hit the Gym", category: "Fitness", target: "1 session", xp: 10, locked: false }
 ];
 
-const STARTER_QUESTS = STARTER_QUESTS_TEMPLATE;
+const STARTER_QUESTS = STARTER_QUESTS_TEMPLATE.map((q, idx) => ({
+  ...q,
+  id: starterQuestUuidForKey(q.starter_key),
+  sort_order: idx
+}));
 
 const STARTER_CONCEPTS = [
   { title: "Python", subtitle: "Daily learning target" },
@@ -175,7 +179,7 @@ async function idbSaveUserRecords(storeName, records, userId) {
 function useUserLocalState(user) {
   const userId = user?.id || "guest";
   const [state, setState] = useState({
-    tasks: STARTER_QUESTS.map((q, idx) => ({ id: `starter-${idx}`, user_id: userId, title: q.title, category: q.category, target: q.target, xp: q.xp, locked: q.locked, active: true, sort_order: idx })),
+    tasks: STARTER_QUESTS.map((q, idx) => ({ id: q.id, starter_key: q.starter_key, user_id: userId, title: q.title, category: q.category, target: q.target, xp: q.xp, locked: q.locked, active: true, sort_order: idx })),
     completions: {},
     books: [],
     wishlist: [],
