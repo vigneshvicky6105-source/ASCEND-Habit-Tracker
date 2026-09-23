@@ -1,6 +1,10 @@
+import { repository, generateUUID, todayStr } from "./lib/repository";
+import { subscribeRealtimeSync, unsubscribeRealtimeSync } from "./lib/realtime";
+import { syncEngine, SYNC_STATES } from "./lib/syncEngine";
+import { supabase } from "./lib/supabase";
+import { SyncDiagnosticsPanel } from "./components/SyncDiagnosticsPanel";
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { createClient } from "@supabase/supabase-js";
 import {
   Check, Flame, Plus, Settings, BookOpen, LogIn, LogOut, WifiOff, Cloud, Dumbbell, Activity, Scale, Apple, Droplets,
   Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpRight, ArrowDownLeft, Lock, Unlock, Calendar, Trophy,
@@ -13,19 +17,10 @@ import {
 } from "recharts";
 import "./styles.css";
 
-// --- SUPABASE CLIENT INITIALIZATION ---
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://vpfuiifncfzndkxstrwe.supabase.co";
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_gL3Gvfi67rQe2eDH42XG1A_4W0sOMuN";
-const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+const IS_DEV = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DIAGNOSTICS === "true" || (typeof window !== "undefined" && window.location.search.includes("diagnostics=true"));
 
 
-function todayStr() {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+
 
 function starterQuestUuidForKey(starterKey) {
   let hash = 0;
@@ -36,7 +31,25 @@ function starterQuestUuidForKey(starterKey) {
   return `00000000-0000-4000-8000-${hex.slice(0, 12)}`;
 }
 
-// --- DEFAULT STARTER DATA ---
+function starterConceptUuidForKey(title) {
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) {
+    hash = (hash * 31 + title.charCodeAt(i)) % 1000000007;
+  }
+  const hex = Math.abs(hash).toString(16).padStart(12, '0');
+  return `00000000-0000-4000-8001-${hex.slice(0, 12)}`;
+}
+
+function starterDueUuidForKey(id) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) % 1000000007;
+  }
+  const hex = Math.abs(hash).toString(16).padStart(12, '0');
+  return `00000000-0000-4000-8002-${hex.slice(0, 12)}`;
+}
+
+// --- DEFAULT STARTER DATA (All Deterministic UUIDs) ---
 const STARTER_QUESTS_TEMPLATE = [
   { starter_key: "starter-leetcode", title: "LeetCode + GeeksforGeeks", category: "Coding", target: "1 problem", xp: 10, locked: true },
   { starter_key: "starter-check-mail", title: "Check Mail", category: "Career/Admin", target: "1 check", xp: 5, locked: true },
@@ -59,7 +72,7 @@ const STARTER_QUESTS = STARTER_QUESTS_TEMPLATE.map((q, idx) => ({
   sort_order: idx
 }));
 
-const STARTER_CONCEPTS = [
+const STARTER_CONCEPTS_TEMPLATE = [
   { title: "Python", subtitle: "Daily learning target" },
   { title: "SQL", subtitle: "Daily learning target" },
   { title: "AI / ML / DL", subtitle: "Daily learning target" },
@@ -67,10 +80,16 @@ const STARTER_CONCEPTS = [
   { title: "Web Development", subtitle: "Daily learning target" }
 ];
 
+const STARTER_CONCEPTS = STARTER_CONCEPTS_TEMPLATE.map((c, idx) => ({
+  id: starterConceptUuidForKey(c.title),
+  title: c.title,
+  subtitle: c.subtitle,
+  sort_order: idx
+}));
 
 const STARTER_DUES = [
   {
-    id: "starter-due-1",
+    id: starterDueUuidForKey("starter-due-1"),
     person_name: "Rahul Sharma",
     type: "lent",
     original_amount: 5000,
@@ -81,7 +100,7 @@ const STARTER_DUES = [
     status: "Partially Paid"
   },
   {
-    id: "starter-due-2",
+    id: starterDueUuidForKey("starter-due-2"),
     person_name: "Ankit Verma",
     type: "owed",
     original_amount: 1200,
@@ -119,643 +138,44 @@ function getLevelRankTitle(level) {
   return { title: "Legend League", icon: "👑", color: "#eab308" };
 }
 
-// --- INDEXEDDB MULTI-USER ISOLATED STORAGE ---
-const DB_NAME = "project_ascend_v4_db";
-const DB_VERSION = 6;
-const STORES = ["tasks", "completions", "books", "wishlist", "concepts", "side_quests", "ai_chat_history", "challenges", "daily_focus", "dues", "fitness", "pending_mutations"];
-
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      STORES.forEach(s => {
-        if (!db.objectStoreNames.contains(s)) {
-          const store = db.createObjectStore(s, { keyPath: "id" });
-          store.createIndex("user_id", "user_id", { unique: false });
-        }
-      });
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function idbGetUserRecords(storeName, userId) {
-  try {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(storeName, "readonly");
-      const store = tx.objectStore(storeName);
-      const index = store.index("user_id");
-      const req = index.getAll(userId);
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => reject(req.error);
-    });
-  } catch {
-    return [];
-  }
-}
-
-async function idbSaveUserRecords(storeName, records, userId) {
-  try {
-    const db = await openDB();
-    const tx = db.transaction(storeName, "readwrite");
-    const store = tx.objectStore(storeName);
-    const index = store.index("user_id");
-    const getAllReq = index.getAllKeys(userId);
-    
-    getAllReq.onsuccess = () => {
-      const existingKeys = getAllReq.result || [];
-      existingKeys.forEach(k => store.delete(k));
-      records.forEach(r => store.put({ ...r, user_id: userId }));
-    };
-    return new Promise((resolve, reject) => {
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  } catch (e) {
-    console.error("IDB save error:", e);
-  }
-}
-
-// Custom Hook for User-Scoped Offline State
-function useUserLocalState(user) {
-  const userId = user?.id || "guest";
-  const [state, setState] = useState({
-    tasks: STARTER_QUESTS.map((q, idx) => ({ id: q.id, starter_key: q.starter_key, user_id: userId, title: q.title, category: q.category, target: q.target, xp: q.xp, locked: q.locked, active: true, sort_order: idx })),
-    completions: {},
-    books: [],
-    wishlist: [],
-    concepts: STARTER_CONCEPTS.map((c, idx) => ({ id: `concept-${idx}`, user_id: userId, title: c.title, subtitle: c.subtitle, sort_order: idx })),
-    side_quests: [],
-    ai_chat_history: [],
-    challenges: STARTER_CHALLENGES.map(c => ({ ...c, user_id: userId })),
-    daily_focus: {},
-    dues: STARTER_DUES,
-    fitness: { weights: [], nutrition: [], workouts: [] }
-  });
+// --- REPOSITORY-BACKED ASCEND STORE HOOK ---
+function useAscendStore(user, authLoading) {
+  const [state, setState] = useState(() => repository.state);
   const [ready, setReady] = useState(false);
 
-  // Load from IndexedDB whenever active user changes
   useEffect(() => {
+    if (authLoading) return;
+
     let active = true;
     setReady(false);
 
-    async function load() {
-      try {
-        let [tasks, completionsArr, books, wishlist, concepts, sideQuestsArr, chatHistoryArr, challengesArr, dailyFocusArr] = await Promise.all(
-          STORES.map(s => idbGetUserRecords(s, userId))
-        );
-        if (!active) return;
+    repository.initSession(user).then(() => {
+      if (active) setReady(true);
+    });
 
-        // AUTO-MIGRATE GUEST DATA TO LOGGED-IN USER ACCOUNT
-        if (userId !== "guest") {
-          const guestTasks = await idbGetUserRecords("tasks", "guest");
-          const guestCompletions = await idbGetUserRecords("completions", "guest");
-          const guestSideQuests = await idbGetUserRecords("side_quests", "guest");
-          const guestBooks = await idbGetUserRecords("books", "guest");
-          const guestWishlist = await idbGetUserRecords("wishlist", "guest");
+    const unsubscribe = repository.subscribe((newState) => {
+      if (active) setState(newState);
+    });
 
-          const hasGuestData = (
-            (guestCompletions && guestCompletions.length > 0) ||
-            (guestSideQuests && guestSideQuests.length > 0) ||
-            (guestBooks && guestBooks.length > 0) ||
-            (guestWishlist && guestWishlist.length > 0) ||
-            (guestTasks && guestTasks.some(t => !t.id.startsWith("starter-")))
-          );
-
-          if (hasGuestData) {
-            console.log("Migrating guest offline data to user profile:", userId);
-            
-            // Merge tasks
-            const taskMap = new Map();
-            (tasks || []).forEach(t => taskMap.set(t.title, t));
-            (guestTasks || []).forEach(gt => {
-              if (!gt.id.startsWith("starter-") || !taskMap.has(gt.title)) {
-                taskMap.set(gt.title, { ...gt, user_id: userId });
-              }
-            });
-            tasks = Array.from(taskMap.values());
-
-            // Merge completions
-            const compMap = new Map();
-            (completionsArr || []).forEach(c => compMap.set(c.key || `${c.task_id}:${c.completed_on}`, c));
-            (guestCompletions || []).forEach(gc => compMap.set(gc.key || `${gc.task_id}:${gc.completed_on}`, { ...gc, user_id: userId }));
-            completionsArr = Array.from(compMap.values());
-
-            // Merge side quests
-            const sqMap = new Map();
-            (sideQuestsArr || []).forEach(sq => sqMap.set(sq.id, sq));
-            (guestSideQuests || []).forEach(gsq => sqMap.set(gsq.id, { ...gsq, user_id: userId }));
-            sideQuestsArr = Array.from(sqMap.values());
-
-            // Merge books
-            const bMap = new Map();
-            (books || []).forEach(b => bMap.set(b.id, b));
-            (guestBooks || []).forEach(gb => bMap.set(gb.id, { ...gb, user_id: userId }));
-            books = Array.from(bMap.values());
-
-            // Merge wishlist
-            const wMap = new Map();
-            (wishlist || []).forEach(w => wMap.set(w.id, w));
-            (guestWishlist || []).forEach(gw => wMap.set(gw.id, { ...gw, user_id: userId }));
-            wishlist = Array.from(wMap.values());
-
-            // Persist migrated records to IndexedDB for logged-in user
-            await Promise.all([
-              idbSaveUserRecords("tasks", tasks, userId),
-              idbSaveUserRecords("completions", completionsArr, userId),
-              idbSaveUserRecords("side_quests", sideQuestsArr, userId),
-              idbSaveUserRecords("books", books, userId),
-              idbSaveUserRecords("wishlist", wishlist, userId)
-            ]);
-          }
-        }
-
-        const completionsMap = {};
-        completionsArr.forEach(c => {
-          completionsMap[c.key || `${c.task_id}:${c.completed_on}`] = true;
-        });
-
-        // Initialize defaults if user has zero tasks
-        let finalTasks = tasks;
-        if (!finalTasks || finalTasks.length === 0) {
-          finalTasks = STARTER_QUESTS.map((q, idx) => ({
-            id: `starter-${idx}`,
-            user_id: userId,
-            title: q.title,
-            category: q.category,
-            target: q.target,
-            xp: q.xp,
-            locked: q.locked,
-            active: true,
-            sort_order: idx,
-            created_at: new Date().toISOString()
-          }));
-        }
-
-        let finalConcepts = concepts;
-        if (!finalConcepts || finalConcepts.length === 0) {
-          finalConcepts = STARTER_CONCEPTS.map((c, idx) => ({
-            id: `concept-${idx}`,
-            user_id: userId,
-            title: c.title,
-            subtitle: c.subtitle,
-            sort_order: idx
-          }));
-        }
-
-        let finalChallenges = challengesArr;
-        if (!finalChallenges || finalChallenges.length === 0) {
-          finalChallenges = STARTER_CHALLENGES.map(c => ({ ...c, user_id: userId }));
-        }
-
-        const dailyFocusMap = {};
-        (dailyFocusArr || []).forEach(f => {
-          if (f.date) dailyFocusMap[f.date] = f.goal;
-        });
-
-        setState({
-          tasks: finalTasks,
-          completions: completionsMap,
-          books,
-          wishlist,
-          concepts: finalConcepts,
-          side_quests: sideQuestsArr || [],
-          ai_chat_history: chatHistoryArr || [],
-          challenges: finalChallenges,
-          daily_focus: dailyFocusMap
-        });
-        setReady(true);
-      } catch (err) {
-        console.error("Error loading local IndexedDB data:", err);
-        setReady(true);
-      }
-    }
-
-    load();
-    return () => { active = false; };
-  }, [userId]);
-
-  // Persist state to IndexedDB on state changes
-  useEffect(() => {
-    if (!ready) return;
-    const save = async () => {
-      try {
-        await Promise.all([
-          idbSaveUserRecords("tasks", state.tasks, userId),
-          idbSaveUserRecords(
-            "completions",
-            Object.keys(state.completions).filter(k => state.completions[k]).map(k => {
-              const [task_id, completed_on] = k.split(":");
-              return { id: `${userId}:${k}`, key: k, task_id, completed_on, user_id: userId };
-            }),
-            userId
-          ),
-          idbSaveUserRecords("books", state.books, userId),
-          idbSaveUserRecords("wishlist", state.wishlist, userId),
-          idbSaveUserRecords("concepts", state.concepts, userId),
-          idbSaveUserRecords("side_quests", state.side_quests || [], userId),
-          idbSaveUserRecords("ai_chat_history", state.ai_chat_history || [], userId),
-          idbSaveUserRecords("challenges", state.challenges || [], userId),
-          idbSaveUserRecords(
-            "daily_focus",
-            Object.keys(state.daily_focus || {}).map(d => ({
-              id: `${userId}:${d}`,
-              date: d,
-              goal: state.daily_focus[d],
-              user_id: userId
-            })),
-            userId
-          )
-        ]);
-      } catch (e) {
-        console.error("Error saving state to IndexedDB:", e);
-      }
+    return () => {
+      active = false;
+      unsubscribe();
     };
-    save();
-  }, [state, ready, userId]);
+  }, [user?.id, authLoading]);
 
-  return [state, setState, ready, userId];
+  return [state, (newState) => repository.setState(newState), ready, user?.id || "guest"];
 }
 
 // --- MAIN APPLICATION COMPONENT ---
 function App() {
+  const [authLoading, setAuthLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [online, setOnline] = useState(navigator.onLine);
   const [tab, setTab] = useState("dashboard");
   const [syncing, setSyncing] = useState(false);
-
-  // Active Modals
-  const [questModal, setQuestModal] = useState(null); // null | { isNew: bool, task: obj }
-  const [bookModal, setBookModal] = useState(null); // null | { isNew: bool, book: obj }
-  const [wishlistModal, setWishlistModal] = useState(null); // null | { isNew: bool, item: obj }
-  const [conceptModal, setConceptModal] = useState(null); // null | { isNew: bool, concept: obj }
-  const [sideQuestModal, setSideQuestModal] = useState(null); // null | { isNew: bool, quest?: obj, defaultDate?: string }
-  
-  const [fitnessSubTab, setFitnessSubTab] = useState("weight"); // "weight" | "nutrition" | "workouts"
-  const [weightModal, setWeightModal] = useState(null); // null | { isNew: bool, item?: obj }
-  const [nutritionModal, setNutritionModal] = useState(null); // null | { isNew: bool, item?: obj }
-  const [workoutModal, setWorkoutModal] = useState(null); // null | { isNew: bool, item?: obj }
-
-  const saveWeightEntry = (entry) => {
-    setLocal(s => {
-      const fit = s.fitness || { weights: [], nutrition: [], workouts: [] };
-      const list = [...(fit.weights || [])];
-      if (entry.isNew) {
-        list.push({
-          id: entry.id || crypto.randomUUID(),
-          date: entry.date,
-          weight: entry.weight,
-          body_fat: entry.body_fat,
-          notes: entry.notes
-        });
-      } else {
-        const idx = list.findIndex(w => w.id === entry.id);
-        if (idx !== -1) {
-          list[idx] = { ...list[idx], date: entry.date, weight: entry.weight, body_fat: entry.body_fat, notes: entry.notes };
-        }
-      }
-      list.sort((a, b) => (a.date > b.date ? 1 : -1));
-      return { ...s, fitness: { ...fit, weights: list } };
-    });
-    setWeightModal(null);
-  };
-
-  const deleteWeightEntry = (id) => {
-    if (confirm("Delete this weight entry?")) {
-      setLocal(s => {
-        const fit = s.fitness || { weights: [], nutrition: [], workouts: [] };
-        return {
-          ...s,
-          fitness: { ...fit, weights: (fit.weights || []).filter(w => w.id !== id) }
-        };
-      });
-    }
-  };
-
-  const saveNutritionEntry = (entry) => {
-    setLocal(s => {
-      const fit = s.fitness || { weights: [], nutrition: [], workouts: [] };
-      const list = [...(fit.nutrition || [])];
-      if (entry.isNew) {
-        list.push({
-          id: entry.id || crypto.randomUUID(),
-          date: entry.date,
-          calories: entry.calories,
-          protein: entry.protein,
-          carbs: entry.carbs,
-          fat: entry.fat,
-          water: entry.water,
-          notes: entry.notes
-        });
-      } else {
-        const idx = list.findIndex(n => n.id === entry.id);
-        if (idx !== -1) {
-          list[idx] = { ...list[idx], date: entry.date, calories: entry.calories, protein: entry.protein, carbs: entry.carbs, fat: entry.fat, water: entry.water, notes: entry.notes };
-        }
-      }
-      list.sort((a, b) => (a.date > b.date ? -1 : 1));
-      return { ...s, fitness: { ...fit, nutrition: list } };
-    });
-    setNutritionModal(null);
-  };
-
-  const deleteNutritionEntry = (id) => {
-    if (confirm("Delete this nutrition log?")) {
-      setLocal(s => {
-        const fit = s.fitness || { weights: [], nutrition: [], workouts: [] };
-        return {
-          ...s,
-          fitness: { ...fit, nutrition: (fit.nutrition || []).filter(n => n.id !== id) }
-        };
-      });
-    }
-  };
-
-  const saveWorkoutEntry = (entry) => {
-    setLocal(s => {
-      const fit = s.fitness || { weights: [], nutrition: [], workouts: [] };
-      const list = [...(fit.workouts || [])];
-      if (entry.isNew) {
-        list.push({
-          id: entry.id || crypto.randomUUID(),
-          date: entry.date,
-          title: entry.title,
-          category: entry.category,
-          duration: entry.duration,
-          calories_burned: entry.calories_burned,
-          notes: entry.notes
-        });
-      } else {
-        const idx = list.findIndex(w => w.id === entry.id);
-        if (idx !== -1) {
-          list[idx] = { ...list[idx], date: entry.date, title: entry.title, category: entry.category, duration: entry.duration, calories_burned: entry.calories_burned, notes: entry.notes };
-        }
-      }
-      list.sort((a, b) => (a.date > b.date ? -1 : 1));
-      return { ...s, fitness: { ...fit, workouts: list } };
-    });
-    setWorkoutModal(null);
-  };
-
-  const deleteWorkoutEntry = (id) => {
-    if (confirm("Delete this workout log?")) {
-      setLocal(s => {
-        const fit = s.fitness || { weights: [], nutrition: [], workouts: [] };
-        return {
-          ...s,
-          fitness: { ...fit, workouts: (fit.workouts || []).filter(w => w.id !== id) }
-        };
-      });
-    }
-  };
-
-  const [dueModal, setDueModal] = useState(null); // null | { isNew: bool, due?: obj, defaultType?: string }
-  const [duesSubTab, setDuesSubTab] = useState("lent"); // "lent" | "owed"
-  const [questSubTab, setQuestSubTab] = useState("main");
-  const [progressSubTab, setProgressSubTab] = useState("analytics"); // "main" | "side"
-  const [notifPermission, setNotifPermission] = useState(() => {
-    try {
-      return (typeof window !== "undefined" && "Notification" in window) ? Notification.permission : "default";
-    } catch (e) {
-      return "default";
-    }
-  });
-  const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem("ascend_gemini_api_key") || "");
-
-  const [local, setLocal, localReady, userId] = useUserLocalState(user);
-
-  // Service worker registration & online listener
-  useEffect(() => {
-    const handleOnline = () => setOnline(true);
-    const handleOffline = () => setOnline(false);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    }
-
-    if (supabase) {
-      supabase.auth.getSession().then(({ data }) => setUser(data.session?.user || null));
-      const { data } = supabase.auth.onAuthStateChange((_e, s) => setUser(s?.user || null));
-      return () => {
-        window.removeEventListener("online", handleOnline);
-        window.removeEventListener("offline", handleOffline);
-        data?.subscription?.unsubscribe();
-      };
-    }
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
-
-  // Supabase Cloud Synchronization Logic
-  async function syncWithCloud() {
-    if (!supabase || !user || !online || !localReady) return;
-    setSyncing(true);
-    try {
-      const uid = user.id;
-
-      // 1. Fetch Cloud Tasks & Automated Deduplication
-      const { data: cloudTasks, error: taskErr } = await supabase.from("tasks").select("*").eq("user_id", uid);
-      if (taskErr) console.warn("Supabase tasks fetch error:", taskErr);
-
-      if (cloudTasks && cloudTasks.length > 0) {
-        const canonicalTasksMap = new Map();
-        const duplicateTaskIdsToDelete = [];
-
-        cloudTasks.forEach(ct => {
-          const key = ct.starter_key || ct.title;
-          if (!canonicalTasksMap.has(key)) {
-            canonicalTasksMap.set(key, ct);
-          } else {
-            const existing = canonicalTasksMap.get(key);
-            const expectedUuid = ct.starter_key ? starterQuestUuidForKey(ct.starter_key) : null;
-            
-            if (expectedUuid && ct.id === expectedUuid && existing.id !== expectedUuid) {
-              duplicateTaskIdsToDelete.push(existing.id);
-              canonicalTasksMap.set(key, ct);
-            } else {
-              duplicateTaskIdsToDelete.push(ct.id);
-            }
-          }
-        });
-
-        // Clean up duplicate tasks from Supabase cloud database
-        if (duplicateTaskIdsToDelete.length > 0) {
-          console.log(`Deduplicating ${duplicateTaskIdsToDelete.length} duplicate cloud tasks for user ${uid}`);
-          await supabase.from("tasks").delete().in("id", duplicateTaskIdsToDelete);
-        }
-
-        const deduplicatedCloudTasks = Array.from(canonicalTasksMap.values());
-
-        // Merge deduplicated cloud tasks with local tasks
-        const mergedMap = new Map();
-        local.tasks.forEach(t => {
-          const key = t.starter_key || t.title;
-          mergedMap.set(key, t);
-        });
-        deduplicatedCloudTasks.forEach(ct => {
-          const key = ct.starter_key || ct.title;
-          mergedMap.set(key, ct);
-        });
-        const mergedTasks = Array.from(mergedMap.values());
-        setLocal(s => ({ ...s, tasks: mergedTasks }));
-      }
-
-      // Upsert local tasks to Supabase with valid UUIDs
-      if (local.tasks.length > 0) {
-        const validTaskUpserts = local.tasks
-          .filter(t => t.id && !t.id.startsWith("starter-"))
-          .map(t => ({
-            id: t.id,
-            starter_key: t.starter_key || null,
-            user_id: uid,
-            title: t.title,
-            category: t.category || "General",
-            target: t.target || "",
-            xp: t.xp || 10,
-            locked: !!t.locked,
-            active: t.active !== false,
-            sort_order: t.sort_order || 0
-          }));
-        
-        if (validTaskUpserts.length > 0) {
-          const { error: upsertErr } = await supabase.from("tasks").upsert(validTaskUpserts, { onConflict: "id" });
-          if (upsertErr) console.warn("Supabase tasks upsert error:", upsertErr);
-        }
-      }
-
-      // 2. Task Completions Bidirectional Sync
-      const { data: cloudCompletions, error: compFetchErr } = await supabase
-        .from("task_completions")
-        .select("*")
-        .eq("user_id", uid);
-      
-      if (compFetchErr) console.warn("Supabase task_completions fetch error:", compFetchErr);
-
-      const mergedCompletions = { ...(local.completions || {}) };
-
-      if (cloudCompletions && cloudCompletions.length > 0) {
-        cloudCompletions.forEach(cc => {
-          if (cc.task_id && cc.completed_on) {
-            mergedCompletions[`${cc.task_id}:${cc.completed_on}`] = true;
-          }
-        });
-        setLocal(s => ({ ...s, completions: mergedCompletions }));
-      }
-
-      // Push local completions to Supabase
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const completionRows = Object.keys(mergedCompletions)
-        .filter(k => mergedCompletions[k])
-        .map(k => {
-          const [task_id, completed_on] = k.split(":");
-          return { user_id: uid, task_id, completed_on };
-        })
-        .filter(row => uuidRegex.test(row.task_id));
-      if (completionRows.length > 0) {
-        const { error: compUpsertErr } = await supabase.from("task_completions").upsert(completionRows, {
-          onConflict: "user_id,task_id,completed_on"
-        });
-        if (compUpsertErr) console.warn("Supabase completions upsert error:", compUpsertErr);
-      }
-
-      // 3. Books Sync
-      if ((local.books || []).length > 0) {
-        await supabase.from("books").upsert(
-          (local.books || []).map(b => ({
-            id: b.id.startsWith("book-") ? undefined : b.id,
-            user_id: uid,
-            title: b.title,
-            author: b.author || "",
-            start_date: b.start_date || null,
-            completed_date: b.completed_date || null,
-            current_page: b.current_page || 0,
-            total_pages: b.total_pages || 0,
-            status: b.status || "Reading",
-            notes: b.notes || ""
-          }))
-        );
-      }
-
-      // 4. Wishlist Sync
-      if (local.wishlist.length > 0) {
-        await supabase.from("wishlist").upsert(
-          local.wishlist.map(w => ({
-            id: w.id.startsWith("wish-") ? undefined : w.id,
-            user_id: uid,
-            item: w.item,
-            category: w.category || "General",
-            estimated_cost: w.estimated_cost || 0,
-            priority: w.priority || "Medium",
-            purchased: !!w.purchased,
-            notes: w.notes || ""
-          }))
-        );
-      }
-
-      // 5. Side Quests Sync
-      if (local.side_quests && local.side_quests.length > 0) {
-        const { data: cloudSideQuests } = await supabase.from("side_quests").select("*").eq("user_id", uid);
-        if (cloudSideQuests && cloudSideQuests.length > 0) {
-          const sqMap = new Map();
-          local.side_quests.forEach(sq => sqMap.set(sq.id, sq));
-          cloudSideQuests.forEach(csq => sqMap.set(csq.id, csq));
-          setLocal(s => ({ ...s, side_quests: Array.from(sqMap.values()) }));
-        }
-        await supabase.from("side_quests").upsert(
-          local.side_quests.map(sq => ({
-            id: (sq.id && !sq.id.startsWith("sq-")) ? sq.id : undefined,
-            user_id: uid,
-            title: sq.title,
-            description: sq.description || "",
-            date: sq.date || todayStr(),
-            priority: sq.priority || "Medium",
-            due_time: sq.due_time || "",
-            category: sq.category || "General",
-            completed: !!sq.completed,
-            created_at: sq.created_at || new Date().toISOString(),
-            completed_at: sq.completed_at || null
-          }))
-        );
-      }
-
-      // 6. Daily Focus Sync
-      const { data: cloudFocus } = await supabase.from("daily_focus").select("*").eq("user_id", uid);
-      if (cloudFocus && cloudFocus.length > 0) {
-        const mergedFocus = { ...(local.daily_focus || {}) };
-        cloudFocus.forEach(df => {
-          if (df.focus_date && df.goal) {
-            mergedFocus[df.focus_date] = df.goal;
-          }
-        });
-        setLocal(s => ({ ...s, daily_focus: mergedFocus }));
-      }
-      const focusRows = Object.keys(local.daily_focus || {})
-        .filter(d => local.daily_focus[d])
-        .map(d => ({ user_id: uid, focus_date: d, goal: local.daily_focus[d] }));
-      if (focusRows.length > 0) {
-        await supabase.from("daily_focus").upsert(focusRows, { onConflict: "user_id,focus_date" });
-      }
-    } catch (err) {
-      console.warn("Cloud sync deferred:", err);
-    } finally {
-      setSyncing(false);
-    }
-  }
-
-  // Auto sync on state changes when online & logged in
-  useEffect(() => {
-    if (user && online && localReady) {
-      const timer = setTimeout(() => syncWithCloud(), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [user, online, localReady, local.tasks, local.completions, local.books, local.wishlist, local.side_quests, local.daily_focus]);
+  const [syncStatus, setSyncStatus] = useState(syncEngine.status);
+  const [syncError, setSyncError] = useState(syncEngine.lastError);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   // Auth Handlers
   async function handleGoogleLogin() {
@@ -770,58 +190,33 @@ function App() {
   }
 
   async function handleLogout() {
-    if (supabase) await supabase.auth.signOut();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    repository.resetSession();
+    unsubscribeRealtimeSync();
     setUser(null);
+  }
+
+  if (authLoading) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "var(--bg-primary)", color: "#ffffff" }}>
+        <RefreshCw size={32} className="spin" style={{ marginBottom: "16px", color: "var(--accent-gold)" }} />
+        <h2 style={{ fontSize: "20px", fontWeight: 600 }}>Initializing ASCEND Session...</h2>
+      </div>
+    );
   }
 
   // --- QUEST ACTIONS ---
 
   const saveDue = (dueData) => {
-    setLocal(s => {
-      const list = [...(s.dues || [])];
-      const orig = parseFloat(dueData.original_amount) || 0;
-      const paid = parseFloat(dueData.amount_paid) || 0;
-      const status = paid >= orig ? "Paid" : paid > 0 ? "Partially Paid" : "Pending";
-      if (dueData.isNew) {
-        list.push({
-          id: dueData.id || crypto.randomUUID(),
-          user_id: userId,
-          person_name: dueData.person_name,
-          type: dueData.type,
-          original_amount: orig,
-          amount_paid: paid,
-          date: dueData.date,
-          due_date: dueData.due_date,
-          reason: dueData.reason,
-          status
-        });
-      } else {
-        const idx = list.findIndex(d => d.id === dueData.id);
-        if (idx !== -1) {
-          list[idx] = {
-            ...list[idx],
-            person_name: dueData.person_name,
-            type: dueData.type,
-            original_amount: orig,
-            amount_paid: paid,
-            date: dueData.date,
-            due_date: dueData.due_date,
-            reason: dueData.reason,
-            status
-          };
-        }
-      }
-      return { ...s, dues: list };
-    });
+    repository.saveDue(dueData, user);
     setDueModal(null);
   };
 
   const deleteDue = (dueId) => {
     if (confirm("Delete this due entry?")) {
-      setLocal(s => ({
-        ...s,
-        dues: (s.dues || []).filter(d => d.id !== dueId)
-      }));
+      repository.deleteDue(dueId, user);
     }
   };
 
@@ -832,47 +227,11 @@ function App() {
   }, [local.tasks]);
 
   const toggleTaskCompletion = async (task) => {
-    const key = `${task.id}:${todayStr()}`;
-    const willBeCompleted = !local.completions[key];
-    setLocal(s => {
-      const completions = { ...s.completions };
-      if (willBeCompleted) {
-        completions[key] = true;
-      } else {
-        delete completions[key];
-      }
-      return { ...s, completions };
-    });
-
-    if (supabase && user && online) {
-      const completed_on = todayStr();
-      if (willBeCompleted) {
-        const { error } = await supabase.from("task_completions").upsert([{
-          user_id: user.id,
-          task_id: task.id,
-          completed_on
-        }], { onConflict: "user_id,task_id,completed_on" });
-        if (error) {
-          console.warn("Supabase completion save error:", error);
-        }
-      } else {
-        const { error } = await supabase.from("task_completions").delete().match({
-          user_id: user.id,
-          task_id: task.id,
-          completed_on
-        });
-        if (error) {
-          console.warn("Supabase completion delete error:", error);
-        }
-      }
-    }
+    await repository.toggleCompletion(task, user);
   };
 
   const toggleTaskLock = (task) => {
-    setLocal(s => ({
-      ...s,
-      tasks: s.tasks.map(t => (t.id === task.id ? { ...t, locked: !t.locked } : t))
-    }));
+    repository.toggleTaskLock(task.id, user);
   };
 
   const moveTaskOrder = (index, direction) => {
@@ -881,7 +240,6 @@ function App() {
     const itemA = activeTasks[index];
     const itemB = activeTasks[targetIdx];
 
-    // Check if either is locked
     if (itemA.locked || itemB.locked) {
       alert("Cannot reorder locked quests. Unlock them first.");
       return;
@@ -895,41 +253,11 @@ function App() {
     updated[idxA].sort_order = updated[idxB].sort_order;
     updated[idxB].sort_order = tempOrder;
 
-    setLocal(s => ({ ...s, tasks: updated }));
+    repository.reorderTasks(updated, user);
   };
 
   const saveQuestModal = (questData) => {
-    if (questData.isNew) {
-      const newTask = {
-        id: crypto.randomUUID(),
-        user_id: userId,
-        title: questData.title,
-        category: questData.category || "Main Quest",
-        target: questData.target || "",
-        xp: parseInt(questData.xp, 10) || 10,
-        locked: !!questData.locked,
-        active: true,
-        sort_order: activeTasks.length,
-        created_at: new Date().toISOString()
-      };
-      setLocal(s => ({ ...s, tasks: [...s.tasks, newTask] }));
-    } else {
-      setLocal(s => ({
-        ...s,
-        tasks: s.tasks.map(t =>
-          t.id === questData.id
-            ? {
-                ...t,
-                title: questData.title,
-                category: questData.category,
-                target: questData.target,
-                xp: parseInt(questData.xp, 10) || 10,
-                locked: questData.locked
-              }
-            : t
-        )
-      }));
-    }
+    repository.saveTask(questData, user);
     setQuestModal(null);
   };
 
@@ -941,206 +269,50 @@ function App() {
       return;
     }
     if (confirm(`Are you sure you want to delete "${task.title}"?`)) {
-      setLocal(s => ({
-        ...s,
-        tasks: s.tasks.map(t => (t.id === taskId ? { ...t, active: false } : t))
-      }));
+      repository.deleteTask(taskId, user);
     }
   };
 
   // --- CORE CONCEPTS ACTIONS ---
   const saveConceptModal = (conceptData) => {
-    if (conceptData.isNew) {
-      const newConcept = {
-        id: crypto.randomUUID(),
-        user_id: userId,
-        title: conceptData.title,
-        subtitle: conceptData.subtitle || "Daily learning target",
-        sort_order: local.concepts.length
-      };
-      setLocal(s => ({ ...s, concepts: [...s.concepts, newConcept] }));
-    } else {
-      setLocal(s => ({
-        ...s,
-        concepts: s.concepts.map(c =>
-          c.id === conceptData.id
-            ? { ...c, title: conceptData.title, subtitle: conceptData.subtitle }
-            : c
-        )
-      }));
-    }
+    repository.saveConcept(conceptData, user);
     setConceptModal(null);
   };
 
   const deleteConcept = (conceptId) => {
     if (confirm("Delete this core concept target?")) {
-      setLocal(s => ({
-        ...s,
-        concepts: s.concepts.filter(c => c.id !== conceptId)
-      }));
+      repository.deleteConcept(conceptId, user);
     }
   };
 
   const saveSideQuestModal = (sqData) => {
-    if (sqData.isNew) {
-      const newSq = {
-        id: crypto.randomUUID(),
-        user_id: userId,
-        title: sqData.title,
-        description: sqData.description || "",
-        date: sqData.date || todayStr(),
-        priority: sqData.priority || "Medium",
-        due_time: sqData.due_time || "",
-        category: sqData.category || "General",
-        completed: false,
-        created_at: new Date().toISOString(),
-        completed_at: null
-      };
-      setLocal(s => ({ ...s, side_quests: [...(s.side_quests || []), newSq] }));
-    } else {
-      setLocal(s => ({
-        ...s,
-        side_quests: (s.side_quests || []).map(sq =>
-          sq.id === sqData.id ? { ...sq, ...sqData } : sq
-        )
-      }));
-    }
+    repository.saveSideQuest(sqData, user);
     setSideQuestModal(null);
   };
 
   const toggleSideQuestCompletion = (sqId) => {
-    setLocal(s => ({
-      ...s,
-      side_quests: (s.side_quests || []).map(sq => {
-        if (sq.id === sqId) {
-          const nextState = !sq.completed;
-          return {
-            ...sq,
-            completed: nextState,
-            completed_at: nextState ? new Date().toISOString() : null
-          };
-        }
-        return sq;
-      })
-    }));
+    repository.toggleSideQuestCompletion(sqId, user);
   };
 
   const deleteSideQuest = (sqId) => {
     if (confirm("Are you sure you want to delete this Side Quest?")) {
-      setLocal(s => ({
-        ...s,
-        side_quests: (s.side_quests || []).filter(sq => sq.id !== sqId)
-      }));
+      repository.deleteSideQuest(sqId, user);
     }
   };
 
   const recoverSideQuest = (sqId) => {
     if (confirm("Recover this failed quest? You will earn 50% XP without altering past activity records.")) {
-      setLocal(s => ({
-        ...s,
-        side_quests: (s.side_quests || []).map(sq => {
-          if (sq.id === sqId) {
-            return { ...sq, completed: true, recovered: true, recovered_at: new Date().toISOString() };
-          }
-          return sq;
-        })
-      }));
+      const sq = (local.side_quests || []).find(s => s.id === sqId);
+      if (sq) {
+        repository.saveSideQuest({ ...sq, completed: true, recovered: true, recovered_at: new Date().toISOString() }, user);
+      }
     }
   };
 
   const updateDailyFocus = (goal) => {
     const today = todayStr();
-    setLocal(s => ({
-      ...s,
-      daily_focus: {
-        ...(s.daily_focus || {}),
-        [today]: goal
-      }
-    }));
+    repository.saveDailyFocus(today, goal, user);
   };
-
-  // --- PUSH NOTIFICATION REMINDERS FOR SIDE QUESTS (10 MIN PRE-DUE) ---
-  const requestNotificationPermission = async () => {
-    if (typeof Notification === "undefined") {
-      alert("Browser push notifications are not supported on this device/browser.");
-      return;
-    }
-    try {
-      const perm = await Notification.requestPermission();
-      setNotifPermission(perm);
-      if (perm === "granted") {
-        const title = "⚔️ Notifications Enabled!";
-        const options = {
-          body: "You will receive reminders 10 minutes before your Side Quests are due.",
-          icon: "/icon-192.png",
-          badge: "/favicon-32.png"
-        };
-        if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.ready.then(reg => reg.showNotification(title, options));
-        } else {
-          new Notification(title, options);
-        }
-      } else if (perm === "denied") {
-        alert("Notification permission was denied in browser settings.");
-      }
-    } catch (e) {
-      console.error("Error requesting notification permission:", e);
-    }
-  };
-
-  useEffect(() => {
-    if (notifPermission !== "granted") return;
-
-    const checkSideQuestReminders = () => {
-      const today = todayStr();
-      const now = new Date();
-      const nowMinutes = now.getHours() * 60 + now.getMinutes();
-
-      const activeSideQuests = local.side_quests || [];
-      const todayQuests = activeSideQuests.filter(sq => sq.date === today && !sq.completed && sq.due_time);
-
-      todayQuests.forEach(sq => {
-        const parts = sq.due_time.split(":");
-        if (parts.length < 2) return;
-        const h = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10);
-        if (isNaN(h) || isNaN(m)) return;
-
-        const dueMinutes = h * 60 + m;
-        const diffMinutes = dueMinutes - nowMinutes;
-
-        // Trigger notification if 10 minutes or less remain before due time (down to -2m overdue)
-        if (diffMinutes <= 10 && diffMinutes >= -2) {
-          const storageKey = `sq_notified_${sq.id}_${today}`;
-          if (!localStorage.getItem(storageKey)) {
-            localStorage.setItem(storageKey, "true");
-
-            const title = diffMinutes > 0
-              ? `⚔️ Side Quest Due in ${diffMinutes}m!`
-              : `⚔️ Side Quest Due NOW!`;
-            const body = `"${sq.title}" is due at ${sq.due_time}. Complete it to earn XP!`;
-            const options = {
-              body,
-              icon: "/icon-192.png",
-              badge: "/favicon-32.png",
-              tag: `sq-reminder-${sq.id}`,
-              renotify: true
-            };
-
-            if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-              navigator.serviceWorker.ready.then(reg => reg.showNotification(title, options));
-            } else if (typeof Notification !== "undefined") {
-              new Notification(title, options);
-            }
-          }
-        }
-      });
-    };
-
-    checkSideQuestReminders();
-    const interval = setInterval(checkSideQuestReminders, 20000);
-    return () => clearInterval(interval);
-  }, [local.side_quests, notifPermission]);
 
   // --- QUICK LOG 10 PAGES READING ACTION ---
   const logReadingTenPages = () => {
@@ -1148,21 +320,14 @@ function App() {
     if (activeBook) {
       const newPage = (activeBook.current_page || 0) + 10;
       const isComplete = activeBook.total_pages > 0 && newPage >= activeBook.total_pages;
-      setLocal(s => ({
-        ...s,
-        books: s.books.map(b =>
-          b.id === activeBook.id
-            ? {
-                ...b,
-                current_page: newPage,
-                status: isComplete ? "Completed" : b.status,
-                completed_date: isComplete ? todayStr() : b.completed_date
-              }
-            : b
-        )
-      }));
+      const updatedBook = {
+        ...activeBook,
+        current_page: newPage,
+        status: isComplete ? "Completed" : activeBook.status,
+        completed_date: isComplete ? todayStr() : activeBook.completed_date
+      };
+      repository.saveBook(updatedBook, user);
     }
-    // Also toggle "Read 10 Pages" main quest if present
     const readQuest = activeTasks.find(t => t.title.toLowerCase().includes("read 10 pages"));
     if (readQuest) {
       const key = `${readQuest.id}:${todayStr()}`;
@@ -1274,10 +439,26 @@ function App() {
         </div>
 
         <div className="headerRightGroup">
-          <div className={`networkBadge ${online ? "online" : "offline"}`}>
-            {online ? <Cloud size={14} /> : <WifiOff size={14} />}
-            <span>{online ? (syncing ? "Syncing..." : "Online Sync") : "Offline Vault"}</span>
+          <div className={`networkBadge ${syncStatus.toLowerCase()}`} title={syncError || ""}>
+            {syncStatus === "SYNCING" && <RefreshCw size={14} className="spin" />}
+            {syncStatus === "SYNCED" && <Cloud size={14} color="#48bb78" />}
+            {syncStatus === "OFFLINE" && <WifiOff size={14} />}
+            {syncStatus === "ERROR" && <X size={14} color="#f56565" />}
+            <span>
+              {syncStatus === "SYNCING" ? "Syncing..." : syncStatus === "SYNCED" ? "Cloud Synced" : syncStatus === "ERROR" ? "Sync Error" : "Offline Vault"}
+            </span>
           </div>
+
+          {IS_DEV && (
+            <button
+              className="iconBtn"
+              onClick={() => setShowDiagnostics(prev => !prev)}
+              title="Toggle Sync Diagnostics Panel"
+              style={{ background: showDiagnostics ? "rgba(245, 185, 66, 0.25)" : "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(245, 185, 66, 0.4)", color: "#f5b942" }}
+            >
+              <Activity size={16} />
+            </button>
+          )}
 
           {user ? (
             <div className="userBadge">
@@ -1537,6 +718,7 @@ function App() {
           currentLevel={currentLevel}
           totalXpAllTime={totalXpAllTime}
           streakStats={streakStats}
+          onToggleDiagnostics={() => setShowDiagnostics(prev => !prev)}
         />
       )}
 
@@ -1602,26 +784,7 @@ function App() {
           modalData={bookModal}
           onClose={() => setBookModal(null)}
           onSave={(bookData) => {
-            if (bookData.isNew) {
-              const newBook = {
-                id: crypto.randomUUID(),
-                user_id: userId,
-                title: bookData.title,
-                author: bookData.author || "",
-                start_date: bookData.start_date || todayStr(),
-                completed_date: null,
-                current_page: parseInt(bookData.current_page, 10) || 0,
-                total_pages: parseInt(bookData.total_pages, 10) || 0,
-                status: bookData.status || "Reading",
-                notes: bookData.notes || ""
-              };
-              setLocal(s => ({ ...s, books: [...s.books, newBook] }));
-            } else {
-              setLocal(s => ({
-                ...s,
-                books: s.books.map(b => (b.id === bookData.id ? { ...b, ...bookData } : b))
-              }));
-            }
+            repository.saveBook(bookData, user);
             setBookModal(null);
           }}
         />
@@ -1632,26 +795,17 @@ function App() {
           modalData={wishlistModal}
           onClose={() => setWishlistModal(null)}
           onSave={(itemData) => {
-            if (itemData.isNew) {
-              const newItem = {
-                id: crypto.randomUUID(),
-                user_id: userId,
-                item: itemData.item,
-                category: itemData.category || "General",
-                estimated_cost: parseFloat(itemData.estimated_cost) || 0,
-                priority: itemData.priority || "Medium",
-                purchased: false,
-                notes: itemData.notes || ""
-              };
-              setLocal(s => ({ ...s, wishlist: [...s.wishlist, newItem] }));
-            } else {
-              setLocal(s => ({
-                ...s,
-                wishlist: s.wishlist.map(w => (w.id === itemData.id ? { ...w, ...itemData } : w))
-              }));
-            }
+            repository.saveWishlist(itemData, user);
             setWishlistModal(null);
           }}
+        />
+      )}
+
+      {IS_DEV && (
+        <SyncDiagnosticsPanel
+          user={user}
+          isOpen={showDiagnostics}
+          onClose={() => setShowDiagnostics(false)}
         />
       )}
 
@@ -2239,7 +1393,7 @@ function AscendAiView({
     if (!query || loading) return;
 
     const userMsg = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       sender: "user",
       text: query,
       timestamp: new Date().toISOString()
@@ -2266,7 +1420,7 @@ function AscendAiView({
       }
 
       const aiMsg = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         sender: "ai",
         text: aiText,
         timestamp: new Date().toISOString()
@@ -2964,31 +2118,27 @@ function SideQuestModal({ modalData, onClose, onSave }) {
 // ==========================================
 // 3. READING COMMAND CENTER COMPONENT
 // ==========================================
-function ReadingView({ books, setLocal, onOpenBookModal, logReadingTenPages }) {
+function ReadingView({ books, setLocal, onOpenBookModal, logReadingTenPages, user }) {
   const activeBook = books.find(b => b.status === "Reading") || books[0];
 
   const handlePageChange = (bookId, newPage) => {
     const val = Math.max(0, parseInt(newPage, 10) || 0);
-    setLocal(s => ({
-      ...s,
-      books: s.books.map(b => {
-        if (b.id === bookId) {
-          const isFinished = b.total_pages > 0 && val >= b.total_pages;
-          return {
-            ...b,
-            current_page: val,
-            status: isFinished ? "Completed" : b.status,
-            completed_date: isFinished ? todayStr() : b.completed_date
-          };
-        }
-        return b;
-      })
-    }));
+    const book = books.find(b => b.id === bookId);
+    if (book) {
+      const isFinished = book.total_pages > 0 && val >= book.total_pages;
+      const updatedBook = {
+        ...book,
+        current_page: val,
+        status: isFinished ? "Completed" : book.status,
+        completed_date: isFinished ? todayStr() : book.completed_date
+      };
+      repository.saveBook(updatedBook, user);
+    }
   };
 
   const deleteBook = (bookId) => {
     if (confirm("Remove this book from your library?")) {
-      setLocal(s => ({ ...s, books: s.books.filter(b => b.id !== bookId) }));
+      repository.deleteBook(bookId, user);
     }
   };
 
@@ -3066,7 +2216,6 @@ function ReadingView({ books, setLocal, onOpenBookModal, logReadingTenPages }) {
 
                 <div className="bookFooterMeta">
                   <span>Started: {book.start_date || "N/A"}</span>
-                  {book.completed_date && <span>Completed: {book.completed_date}</span>}
                 </div>
               </div>
             );
@@ -3080,19 +2229,19 @@ function ReadingView({ books, setLocal, onOpenBookModal, logReadingTenPages }) {
 // ==========================================
 // 4. WISHLIST ("THINGS TO BUY") COMPONENT
 // ==========================================
-function WishlistView({ wishlist, setLocal, onOpenWishlistModal }) {
+function WishlistView({ wishlist, setLocal, onOpenWishlistModal, user }) {
   const [filter, setFilter] = useState("all"); // 'all' | 'active' | 'purchased'
 
   const togglePurchased = (id) => {
-    setLocal(s => ({
-      ...s,
-      wishlist: s.wishlist.map(w => (w.id === id ? { ...w, purchased: !w.purchased } : w))
-    }));
+    const item = wishlist.find(w => w.id === id);
+    if (item) {
+      repository.saveWishlist({ ...item, purchased: !item.purchased }, user);
+    }
   };
 
   const deleteWishItem = (id) => {
     if (confirm("Remove item from wishlist?")) {
-      setLocal(s => ({ ...s, wishlist: s.wishlist.filter(w => w.id !== id) }));
+      repository.deleteWishlist(id, user);
     }
   };
 
@@ -3803,7 +2952,7 @@ function ChallengesView({ local, setLocal }) {
 // 6. SETTINGS VIEW COMPONENT
 // ==========================================
 // ==========================================
-function ProfileView({ user, online, syncWithCloud, syncing, notifPermission, requestNotificationPermission, geminiKey, setGeminiKey, handleGoogleLogin, handleLogout, local, currentLevel, totalXpAllTime, streakStats }) {
+function ProfileView({ user, online, syncWithCloud, syncing, notifPermission, requestNotificationPermission, geminiKey, setGeminiKey, handleGoogleLogin, handleLogout, local, currentLevel, totalXpAllTime, streakStats, onToggleDiagnostics }) {
   const rankInfo = getLevelRankTitle(currentLevel);
   const pendingCount = (local.pending_mutations || []).length;
 
@@ -3947,11 +3096,17 @@ function ProfileView({ user, online, syncWithCloud, syncing, notifPermission, re
               <span className="profileRowLabel">Pending Offline Edits</span>
               <span className="profileRowValue">{pendingCount} pending</span>
             </div>
-            <div style={{ marginTop: 8 }}>
+            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: "8px" }}>
               {user && online && (
                 <button className="primaryBtn" onClick={syncWithCloud} disabled={syncing} style={{ width: "100%" }}>
                   <RefreshCw size={16} className={syncing ? "spin" : ""} />
                   <span>{syncing ? "Syncing with Supabase..." : "Sync Cloud Now"}</span>
+                </button>
+              )}
+              {IS_DEV && onToggleDiagnostics && (
+                <button className="secondaryBtn" onClick={onToggleDiagnostics} style={{ width: "100%", borderColor: "rgba(245, 185, 66, 0.4)", color: "#f5b942" }}>
+                  <Activity size={16} />
+                  <span>Open Sync Diagnostics Panel</span>
                 </button>
               )}
             </div>
@@ -4950,7 +4105,7 @@ function WorkoutModal({ modalData, onClose, onSave }) {
 createRoot(document.getElementById("root")).render(<ErrorBoundary><App /></ErrorBoundary>);
 
 
-function DuesView({ dues, subTab, setSubTab, setLocal, onOpenDueModal, onDeleteDue }) {
+function DuesView({ dues, subTab, setSubTab, setLocal, onOpenDueModal, onDeleteDue, user }) {
   const today = todayStr();
 
   // Filter dues by type (lent or owed)
@@ -4987,14 +4142,7 @@ function DuesView({ dues, subTab, setSubTab, setLocal, onOpenDueModal, onDeleteD
 
   const markAsPaid = (due) => {
     const orig = Number(due.original_amount) || 0;
-    setLocal(s => ({
-      ...s,
-      dues: (s.dues || []).map(d =>
-        d.id === due.id
-          ? { ...d, amount_paid: orig, status: "Paid", updated_at: new Date().toISOString() }
-          : d
-      )
-    }));
+    repository.saveDue({ ...due, amount_paid: orig, status: "Paid" }, user);
   };
 
   const handleQuickPayment = (due) => {
@@ -5012,14 +4160,7 @@ function DuesView({ dues, subTab, setSubTab, setLocal, onOpenDueModal, onDeleteD
     if (newPaid >= orig && orig > 0) newStatus = "Paid";
     else if (newPaid > 0) newStatus = "Partially Paid";
 
-    setLocal(s => ({
-      ...s,
-      dues: (s.dues || []).map(d =>
-        d.id === due.id
-          ? { ...d, amount_paid: newPaid, status: newStatus, updated_at: new Date().toISOString() }
-          : d
-      )
-    }));
+    repository.saveDue({ ...due, amount_paid: newPaid, status: newStatus }, user);
   };
 
   return (

@@ -1,9 +1,9 @@
 -- ==============================================================================
--- PROJECT ASCEND — COMPLETE SUPABASE DATABASE SCHEMA
+-- PROJECT ASCEND — COMPREHENSIVE SUPABASE SCHEMA & SECURITY MIGRATION
 -- Run this script in your Supabase SQL Editor (https://supabase.com/dashboard/project/_/sql)
 -- ==============================================================================
 
--- 1. Tables Definition
+-- 1. Ensure Table Schema Base Structure & Columns
 create table if not exists public.tasks (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -150,17 +150,47 @@ create table if not exists public.whatsapp_reminders (
   created_at timestamptz not null default now()
 );
 
--- 2. Uniqueness Constraints
+-- 2. Ensure Add Missing Columns Idempotently
+alter table public.tasks add column if not exists starter_key text default null;
+alter table public.tasks add column if not exists updated_at timestamptz not null default now();
+alter table public.tasks add column if not exists deleted_at timestamptz default null;
+
+alter table public.task_completions add column if not exists updated_at timestamptz not null default now();
+alter table public.task_completions add column if not exists deleted_at timestamptz default null;
+
+alter table public.books add column if not exists updated_at timestamptz not null default now();
+alter table public.books add column if not exists deleted_at timestamptz default null;
+
+alter table public.wishlist add column if not exists updated_at timestamptz not null default now();
+alter table public.wishlist add column if not exists deleted_at timestamptz default null;
+
+alter table public.core_concepts add column if not exists updated_at timestamptz not null default now();
+alter table public.core_concepts add column if not exists deleted_at timestamptz default null;
+
+alter table public.side_quests add column if not exists updated_at timestamptz not null default now();
+alter table public.side_quests add column if not exists deleted_at timestamptz default null;
+
+alter table public.dues add column if not exists updated_at timestamptz not null default now();
+alter table public.dues add column if not exists deleted_at timestamptz default null;
+
+alter table public.fitness_logs add column if not exists updated_at timestamptz not null default now();
+alter table public.fitness_logs add column if not exists deleted_at timestamptz default null;
+
+alter table public.daily_focus add column if not exists updated_at timestamptz not null default now();
+alter table public.daily_focus add column if not exists deleted_at timestamptz default null;
+
+-- 3. Logical Uniqueness Constraints & Idempotency
 alter table public.task_completions drop constraint if exists task_completions_user_id_task_id_completed_on_key;
 alter table public.task_completions add constraint task_completions_user_id_task_id_completed_on_key unique (user_id, task_id, completed_on);
 
 alter table public.daily_focus drop constraint if exists daily_focus_user_id_focus_date_key;
 alter table public.daily_focus add constraint daily_focus_user_id_focus_date_key unique (user_id, focus_date);
 
+-- Unique index for starter tasks to prevent duplicate starter seeding
 drop index if exists idx_tasks_user_starter_key;
 create unique index idx_tasks_user_starter_key on public.tasks (user_id, starter_key) where starter_key is not null;
 
--- 3. High Performance Indexes
+-- 4. High Performance Indexes
 create index if not exists idx_tasks_user_id on public.tasks(user_id);
 create index if not exists idx_tasks_user_updated on public.tasks(user_id, updated_at);
 
@@ -192,7 +222,7 @@ create index if not exists idx_daily_focus_user_updated on public.daily_focus(us
 
 create index if not exists idx_whatsapp_reminders_user_id on public.whatsapp_reminders(user_id);
 
--- 4. Automated PostgreSQL Updated_At Trigger Function
+-- 5. Automated PostgreSQL Updated_At Trigger Function
 create or replace function public.set_updated_at()
 returns trigger as $$
 begin
@@ -201,6 +231,7 @@ begin
 end;
 $$ language plpgsql;
 
+-- Attach triggers to all user tables
 drop trigger if exists trg_tasks_set_updated_at on public.tasks;
 create trigger trg_tasks_set_updated_at before update on public.tasks for each row execute function public.set_updated_at();
 
@@ -231,7 +262,7 @@ create trigger trg_fitness_set_updated_at before update on public.fitness_logs f
 drop trigger if exists trg_daily_focus_set_updated_at on public.daily_focus;
 create trigger trg_daily_focus_set_updated_at before update on public.daily_focus for each row execute function public.set_updated_at();
 
--- 5. Row-Level Security (RLS) & Granular Policy Definitions
+-- 6. Enable Row-Level Security (RLS) & Granular Policy Definitions
 alter table public.tasks enable row level security;
 alter table public.task_completions enable row level security;
 alter table public.books enable row level security;
@@ -244,7 +275,20 @@ alter table public.fitness_logs enable row level security;
 alter table public.daily_focus enable row level security;
 alter table public.whatsapp_reminders enable row level security;
 
--- Tasks Policies
+-- Drop legacy broad policies
+drop policy if exists "tasks own" on public.tasks;
+drop policy if exists "completions own" on public.task_completions;
+drop policy if exists "books own" on public.books;
+drop policy if exists "wishlist own" on public.wishlist;
+drop policy if exists "core_concepts own" on public.core_concepts;
+drop policy if exists "settings own" on public.profile_settings;
+drop policy if exists "side_quests own" on public.side_quests;
+drop policy if exists "dues own" on public.dues;
+drop policy if exists "fitness_logs own" on public.fitness_logs;
+drop policy if exists "daily_focus own" on public.daily_focus;
+drop policy if exists "whatsapp_reminders own" on public.whatsapp_reminders;
+
+-- Define Granular CRUD Policies for Tasks
 drop policy if exists "tasks_select" on public.tasks;
 create policy "tasks_select" on public.tasks for select using (auth.uid() = user_id);
 drop policy if exists "tasks_insert" on public.tasks;
@@ -254,7 +298,7 @@ create policy "tasks_update" on public.tasks for update using (auth.uid() = user
 drop policy if exists "tasks_delete" on public.tasks;
 create policy "tasks_delete" on public.tasks for delete using (auth.uid() = user_id);
 
--- Completions Policies
+-- Define Granular CRUD Policies for Task Completions
 drop policy if exists "completions_select" on public.task_completions;
 create policy "completions_select" on public.task_completions for select using (auth.uid() = user_id);
 drop policy if exists "completions_insert" on public.task_completions;
@@ -264,7 +308,7 @@ create policy "completions_update" on public.task_completions for update using (
 drop policy if exists "completions_delete" on public.task_completions;
 create policy "completions_delete" on public.task_completions for delete using (auth.uid() = user_id);
 
--- Books Policies
+-- Define Granular CRUD Policies for Books
 drop policy if exists "books_select" on public.books;
 create policy "books_select" on public.books for select using (auth.uid() = user_id);
 drop policy if exists "books_insert" on public.books;
@@ -274,7 +318,7 @@ create policy "books_update" on public.books for update using (auth.uid() = user
 drop policy if exists "books_delete" on public.books;
 create policy "books_delete" on public.books for delete using (auth.uid() = user_id);
 
--- Wishlist Policies
+-- Define Granular CRUD Policies for Wishlist
 drop policy if exists "wishlist_select" on public.wishlist;
 create policy "wishlist_select" on public.wishlist for select using (auth.uid() = user_id);
 drop policy if exists "wishlist_insert" on public.wishlist;
@@ -284,7 +328,7 @@ create policy "wishlist_update" on public.wishlist for update using (auth.uid() 
 drop policy if exists "wishlist_delete" on public.wishlist;
 create policy "wishlist_delete" on public.wishlist for delete using (auth.uid() = user_id);
 
--- Core Concepts Policies
+-- Define Granular CRUD Policies for Core Concepts
 drop policy if exists "concepts_select" on public.core_concepts;
 create policy "concepts_select" on public.core_concepts for select using (auth.uid() = user_id);
 drop policy if exists "concepts_insert" on public.core_concepts;
@@ -294,7 +338,7 @@ create policy "concepts_update" on public.core_concepts for update using (auth.u
 drop policy if exists "concepts_delete" on public.core_concepts;
 create policy "concepts_delete" on public.core_concepts for delete using (auth.uid() = user_id);
 
--- Profile Settings Policies
+-- Define Granular CRUD Policies for Profile Settings
 drop policy if exists "settings_select" on public.profile_settings;
 create policy "settings_select" on public.profile_settings for select using (auth.uid() = user_id);
 drop policy if exists "settings_insert" on public.profile_settings;
@@ -304,7 +348,7 @@ create policy "settings_update" on public.profile_settings for update using (aut
 drop policy if exists "settings_delete" on public.profile_settings;
 create policy "settings_delete" on public.profile_settings for delete using (auth.uid() = user_id);
 
--- Side Quests Policies
+-- Define Granular CRUD Policies for Side Quests
 drop policy if exists "side_quests_select" on public.side_quests;
 create policy "side_quests_select" on public.side_quests for select using (auth.uid() = user_id);
 drop policy if exists "side_quests_insert" on public.side_quests;
@@ -314,7 +358,7 @@ create policy "side_quests_update" on public.side_quests for update using (auth.
 drop policy if exists "side_quests_delete" on public.side_quests;
 create policy "side_quests_delete" on public.side_quests for delete using (auth.uid() = user_id);
 
--- Dues Policies
+-- Define Granular CRUD Policies for Dues
 drop policy if exists "dues_select" on public.dues;
 create policy "dues_select" on public.dues for select using (auth.uid() = user_id);
 drop policy if exists "dues_insert" on public.dues;
@@ -324,7 +368,7 @@ create policy "dues_update" on public.dues for update using (auth.uid() = user_i
 drop policy if exists "dues_delete" on public.dues;
 create policy "dues_delete" on public.dues for delete using (auth.uid() = user_id);
 
--- Fitness Logs Policies
+-- Define Granular CRUD Policies for Fitness Logs
 drop policy if exists "fitness_select" on public.fitness_logs;
 create policy "fitness_select" on public.fitness_logs for select using (auth.uid() = user_id);
 drop policy if exists "fitness_insert" on public.fitness_logs;
@@ -334,7 +378,7 @@ create policy "fitness_update" on public.fitness_logs for update using (auth.uid
 drop policy if exists "fitness_delete" on public.fitness_logs;
 create policy "fitness_delete" on public.fitness_logs for delete using (auth.uid() = user_id);
 
--- Daily Focus Policies
+-- Define Granular CRUD Policies for Daily Focus
 drop policy if exists "daily_focus_select" on public.daily_focus;
 create policy "daily_focus_select" on public.daily_focus for select using (auth.uid() = user_id);
 drop policy if exists "daily_focus_insert" on public.daily_focus;
@@ -344,7 +388,7 @@ create policy "daily_focus_update" on public.daily_focus for update using (auth.
 drop policy if exists "daily_focus_delete" on public.daily_focus;
 create policy "daily_focus_delete" on public.daily_focus for delete using (auth.uid() = user_id);
 
--- WhatsApp Reminders Policies
+-- Define Granular CRUD Policies for WhatsApp Reminders
 drop policy if exists "whatsapp_select" on public.whatsapp_reminders;
 create policy "whatsapp_select" on public.whatsapp_reminders for select using (auth.uid() = user_id);
 drop policy if exists "whatsapp_insert" on public.whatsapp_reminders;
