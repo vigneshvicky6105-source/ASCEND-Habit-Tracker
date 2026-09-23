@@ -149,7 +149,14 @@ function useAscendStore(user, authLoading) {
     let active = true;
     setReady(false);
 
+    console.log("[ASCEND AUTH] IndexedDB & store initialization starting for user:", user?.id || "guest");
     repository.initSession(user).then(() => {
+      if (active) {
+        console.log("[ASCEND AUTH] IndexedDB initialized");
+        setReady(true);
+      }
+    }).catch((err) => {
+      console.error("[ASCEND AUTH] Initialization failed in store:", err);
       if (active) setReady(true);
     });
 
@@ -176,6 +183,110 @@ function App() {
   const [syncStatus, setSyncStatus] = useState(syncEngine.status);
   const [syncError, setSyncError] = useState(syncEngine.lastError);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+
+  const [local, setLocal, localReady, activeUserId] = useAscendStore(user, authLoading);
+
+  // --- SUPABASE AUTHENTICATION INITIALIZATION ---
+  useEffect(() => {
+    let isMounted = true;
+    console.log("[ASCEND AUTH] App started");
+    console.log("[ASCEND AUTH] Supabase client created:", !!supabase);
+    console.log("[ASCEND AUTH] Environment loaded");
+
+    async function initAuth() {
+      try {
+        console.log("[ASCEND AUTH] Calling getSession");
+        if (!supabase) {
+          console.log("[ASCEND AUTH] No Supabase client available");
+          if (isMounted) {
+            setUser(null);
+            setAuthLoading(false);
+            console.log("[ASCEND AUTH] Initialization completed");
+          }
+          return;
+        }
+
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error("[ASCEND AUTH] getSession error:", error);
+          if (isMounted) setUser(null);
+        } else if (data?.session?.user) {
+          console.log("[ASCEND AUTH] getSession resolved - Session found:", data.session.user.id);
+          if (isMounted) setUser(data.session.user);
+        } else {
+          console.log("[ASCEND AUTH] getSession resolved - No session");
+          if (isMounted) setUser(null);
+        }
+      } catch (err) {
+        console.error("[ASCEND AUTH] getSession exception:", err);
+        if (isMounted) setUser(null);
+      } finally {
+        if (isMounted) {
+          setAuthLoading(false);
+          console.log("[ASCEND AUTH] Initialization completed");
+        }
+      }
+    }
+
+    initAuth();
+
+    let authSub = null;
+    if (supabase) {
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log("[ASCEND AUTH] onAuthStateChange fired:", event, session?.user?.id);
+        if (isMounted) {
+          if (session?.user) {
+            console.log("[ASCEND AUTH] Session found");
+            setUser(session.user);
+          } else {
+            console.log("[ASCEND AUTH] No session");
+            setUser(null);
+          }
+          setAuthLoading(false);
+        }
+      });
+      authSub = data?.subscription;
+    }
+
+    return () => {
+      isMounted = false;
+      if (authSub) authSub.unsubscribe();
+    };
+  }, []);
+
+  // --- REALTIME & NETWORK LISTENERS ---
+  useEffect(() => {
+    if (user?.id) {
+      console.log("[ASCEND AUTH] Cloud sync started");
+      subscribeRealtimeSync(user.id);
+      console.log("[ASCEND AUTH] Cloud sync completed");
+    } else {
+      unsubscribeRealtimeSync();
+    }
+    return () => {
+      unsubscribeRealtimeSync();
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    const unsub = syncEngine.subscribeStatus((status, err) => {
+      setSyncStatus(status);
+      setSyncError(err);
+      setSyncing(status === SYNC_STATES.SYNCING);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   // Auth Handlers
   async function handleGoogleLogin() {
