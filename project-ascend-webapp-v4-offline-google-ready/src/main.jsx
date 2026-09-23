@@ -309,6 +309,90 @@ function App() {
     setUser(null);
   }
 
+  // --- UNCONDITIONAL TOP-LEVEL HOOKS (Rules of Hooks Compliance) ---
+  const safeTasks = local?.tasks || [];
+  const safeCompletions = local?.completions || {};
+  const safeSideQuests = local?.side_quests || [];
+
+  const activeTasks = useMemo(() => {
+    return safeTasks
+      .filter(t => t.active !== false)
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  }, [safeTasks]);
+
+  const todayCompletionsCount = useMemo(() => {
+    return activeTasks.filter(t => safeCompletions[`${t.id}:${todayStr()}`]).length;
+  }, [activeTasks, safeCompletions]);
+
+  const completionPct = activeTasks.length ? Math.round((todayCompletionsCount / activeTasks.length) * 100) : 0;
+  
+  const todayXp = useMemo(() => {
+    return activeTasks
+      .filter(t => safeCompletions[`${t.id}:${todayStr()}`])
+      .reduce((acc, t) => acc + (t.xp || 10), 0);
+  }, [activeTasks, safeCompletions]);
+
+  const totalXpAllTime = useMemo(() => {
+    let total = 0;
+    Object.keys(safeCompletions || {}).forEach(k => {
+      if (safeCompletions[k]) {
+        const [taskId] = k.split(":");
+        const task = safeTasks.find(t => t.id === taskId);
+        total += task ? (task.xp || 10) : 10;
+      }
+    });
+    (safeSideQuests || []).forEach(sq => {
+      if (sq.completed) {
+        const xp = sq.priority === "High" ? 30 : sq.priority === "Medium" ? 20 : 10;
+        total += xp;
+      }
+    });
+    return total;
+  }, [safeCompletions, safeTasks, safeSideQuests]);
+
+  const currentLevel = Math.floor(totalXpAllTime / 100) + 1;
+  const levelProgress = totalXpAllTime % 100;
+
+  const streakStats = useMemo(() => {
+    let currentStreak = 0;
+    let maxStreak = 0;
+    let checkDate = new Date();
+    
+    while (true) {
+      const dateKey = checkDate.toISOString().slice(0, 10);
+      const dayDone = activeTasks.some(t => safeCompletions[`${t.id}:${dateKey}`]);
+      if (dayDone) {
+        currentStreak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        if (dateKey === todayStr() && currentStreak === 0) {
+          checkDate.setDate(checkDate.getDate() - 1);
+          const yesterdayKey = checkDate.toISOString().slice(0, 10);
+          if (activeTasks.some(t => safeCompletions[`${t.id}:${yesterdayKey}`])) {
+            continue;
+          }
+        }
+        break;
+      }
+    }
+
+    let tempStreak = 0;
+    for (let i = 90; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      const dayDone = activeTasks.some(t => safeCompletions[`${t.id}:${key}`]);
+      if (dayDone) {
+        tempStreak++;
+        if (tempStreak > maxStreak) maxStreak = tempStreak;
+      } else {
+        tempStreak = 0;
+      }
+    }
+
+    return { currentStreak, maxStreak: Math.max(maxStreak, currentStreak) };
+  }, [activeTasks, safeCompletions]);
+
   if (authLoading) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "var(--bg-primary)", color: "#ffffff" }}>
@@ -330,12 +414,6 @@ function App() {
       repository.deleteDue(dueId, user);
     }
   };
-
-  const activeTasks = useMemo(() => {
-    return local.tasks
-      .filter(t => t.active !== false)
-      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-  }, [local.tasks]);
 
   const toggleTaskCompletion = async (task) => {
     await repository.toggleCompletion(task, user);
@@ -448,87 +526,10 @@ function App() {
     }
   };
 
-  // --- CALCULATED STATS & ANALYTICS ---
-  const todayCompletionsCount = useMemo(() => {
-    return activeTasks.filter(t => local.completions[`${t.id}:${todayStr()}`]).length;
-  }, [activeTasks, local.completions]);
 
-  const completionPct = activeTasks.length ? Math.round((todayCompletionsCount / activeTasks.length) * 100) : 0;
+
+
   
-  const todayXp = useMemo(() => {
-    return activeTasks
-      .filter(t => local.completions[`${t.id}:${todayStr()}`])
-      .reduce((acc, t) => acc + (t.xp || 10), 0);
-  }, [activeTasks, local.completions]);
-
-  // Level logic: level = floor(Total Cumulative XP / 100) + 1
-  const totalXpAllTime = useMemo(() => {
-    let total = 0;
-    Object.keys(local.completions || {}).forEach(k => {
-      if (local.completions[k]) {
-        const [taskId] = k.split(":");
-        const task = local.tasks.find(t => t.id === taskId);
-        total += task ? (task.xp || 10) : 10;
-      }
-    });
-    // Side Quests XP (+10 Low, +20 Medium, +30 High)
-    (local.side_quests || []).forEach(sq => {
-      if (sq.completed) {
-        const xp = sq.priority === "High" ? 30 : sq.priority === "Medium" ? 20 : 10;
-        total += xp;
-      }
-    });
-    return total;
-  }, [local.completions, local.tasks, local.side_quests]);
-
-  const currentLevel = Math.floor(totalXpAllTime / 100) + 1;
-  const levelProgress = totalXpAllTime % 100;
-
-  // Streak Calculation Algorithm
-  const streakStats = useMemo(() => {
-    let currentStreak = 0;
-    let maxStreak = 0;
-    let checkDate = new Date();
-    
-    // Check backwards day by day
-    while (true) {
-      const dateKey = checkDate.toISOString().slice(0, 10);
-      const dayDone = activeTasks.some(t => local.completions[`${t.id}:${dateKey}`]);
-      if (dayDone) {
-        currentStreak++;
-        checkDate.setDate(checkDate.getDate() - 1);
-      } else {
-        // If today is not done yet, allow checking yesterday before breaking current streak
-        if (dateKey === todayStr() && currentStreak === 0) {
-          checkDate.setDate(checkDate.getDate() - 1);
-          const yesterdayKey = checkDate.toISOString().slice(0, 10);
-          if (activeTasks.some(t => local.completions[`${t.id}:${yesterdayKey}`])) {
-            // Continuation from yesterday
-            continue;
-          }
-        }
-        break;
-      }
-    }
-
-    // Calculate overall max streak across historical data
-    let tempStreak = 0;
-    for (let i = 90; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
-      const dayDone = activeTasks.some(t => local.completions[`${t.id}:${key}`]);
-      if (dayDone) {
-        tempStreak++;
-        if (tempStreak > maxStreak) maxStreak = tempStreak;
-      } else {
-        tempStreak = 0;
-      }
-    }
-
-    return { currentStreak, maxStreak: Math.max(maxStreak, currentStreak) };
-  }, [activeTasks, local.completions]);
-
   if (!localReady) {
     return (
       <div className="loadingShell">
