@@ -184,6 +184,17 @@ function App() {
   const [syncError, setSyncError] = useState(syncEngine.lastError);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
+  // Modal States
+  const [questModal, setQuestModal] = useState(null);
+  const [sideQuestModal, setSideQuestModal] = useState(null);
+  const [conceptModal, setConceptModal] = useState(null);
+  const [bookModal, setBookModal] = useState(null);
+  const [wishlistModal, setWishlistModal] = useState(null);
+  const [dueModal, setDueModal] = useState(null);
+  const [weightModal, setWeightModal] = useState(null);
+  const [nutritionModal, setNutritionModal] = useState(null);
+  const [workoutModal, setWorkoutModal] = useState(null);
+
   const [local, setLocal, localReady, activeUserId] = useAscendStore(user, authLoading);
 
   // --- SUPABASE AUTHENTICATION INITIALIZATION ---
