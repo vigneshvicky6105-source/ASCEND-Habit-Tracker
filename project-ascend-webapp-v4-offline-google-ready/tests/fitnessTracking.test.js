@@ -25,7 +25,7 @@ test("Fitness Upgrade Suite - Solomon 6-Day Workout Split Import & Template Seed
 
     const tuesday = SOLOMON_WORKOUT_TEMPLATE.find(d => d.day === "Tuesday");
     assert.equal(tuesday.title, "BACK + BICEPS");
-    assert.equal(tuesday.exercises[0].name, "Lat Pulldown Wide");
+    assert.equal(tuesday.exercises[0].name, "Lat Pulldown (Wide)");
 
     const sunday = SOLOMON_WORKOUT_TEMPLATE.find(d => d.day === "Sunday");
     assert.equal(sunday.isRest, true);

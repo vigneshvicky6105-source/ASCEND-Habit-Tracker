@@ -125,6 +125,76 @@ create table if not exists public.fitness_logs (
   deleted_at timestamptz default null
 );
 
+create table if not exists public.fitness_programs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null default 'Solomon 6-Day Split',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.fitness_days (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  program_id uuid references public.fitness_programs(id) on delete cascade,
+  day_of_week integer not null,
+  name text not null,
+  muscle_groups text default '',
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.fitness_exercises (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  day_id uuid references public.fitness_days(id) on delete cascade,
+  name text not null,
+  muscle_group text not null,
+  target_reps text not null default '10',
+  target_sets integer not null default 3,
+  default_weight numeric default 0,
+  sort_order integer not null default 0,
+  optional boolean not null default false,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.workout_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  day_id uuid references public.fitness_days(id) on delete set null,
+  split_title text not null,
+  day_name text not null,
+  workout_date date not null default CURRENT_DATE,
+  status text not null default 'COMPLETED',
+  started_at timestamptz default now(),
+  completed_at timestamptz default now(),
+  duration_minutes integer default 45,
+  total_volume numeric default 0,
+  total_sets integer default 0,
+  total_reps integer default 0,
+  notes text default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.workout_sets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  session_id uuid references public.workout_sessions(id) on delete cascade,
+  exercise_id text not null,
+  set_number integer not null default 1,
+  weight numeric not null default 0,
+  actual_reps integer not null default 0,
+  target_reps text default '',
+  completed boolean not null default true,
+  notes text default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.daily_focus (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,

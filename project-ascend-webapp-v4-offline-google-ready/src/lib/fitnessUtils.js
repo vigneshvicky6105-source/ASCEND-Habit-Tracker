@@ -143,3 +143,158 @@ export function detectNewPRs(allSets, currentSessionSets, currentSessionId) {
 
   return newPRs;
 }
+
+export function getAllExercisePRs(allSets, routine = []) {
+  if (!Array.isArray(allSets)) return [];
+
+  const sessionsMap = {};
+
+  // Extract all distinct exercise IDs from sets and routine
+  const exerciseMeta = {};
+
+  if (Array.isArray(routine)) {
+    routine.forEach(day => {
+      (day.exercises || []).forEach(ex => {
+        exerciseMeta[ex.id] = { id: ex.id, name: ex.name, muscleGroup: ex.muscleGroup };
+      });
+    });
+  }
+
+  const exerciseSetsMap = {};
+  allSets.forEach(s => {
+    if (s.completed === false || !s.exercise_id) return;
+    if (!exerciseMeta[s.exercise_id]) {
+      exerciseMeta[s.exercise_id] = { id: s.exercise_id, name: s.exercise_name || "Exercise", muscleGroup: "Other" };
+    }
+    if (!exerciseSetsMap[s.exercise_id]) exerciseSetsMap[s.exercise_id] = [];
+    exerciseSetsMap[s.exercise_id].push(s);
+  });
+
+  const prList = [];
+
+  Object.keys(exerciseMeta).forEach(exId => {
+    const meta = exerciseMeta[exId];
+    const sets = exerciseSetsMap[exId] || [];
+
+    if (sets.length === 0) {
+      prList.push({
+        id: exId,
+        name: meta.name,
+        muscleGroup: meta.muscleGroup,
+        maxWeight: 0,
+        bestReps: 0,
+        highestSetVolume: 0,
+        highestSessionVolume: 0,
+        prDate: null,
+        totalSetsLogged: 0
+      });
+      return;
+    }
+
+    let maxWeight = 0;
+    let bestReps = 0;
+    let highestSetVolume = 0;
+    let prDate = null;
+
+    // Group sets by session to compute max session exercise volume
+    const sessionVolumeMap = {};
+
+    sets.forEach(s => {
+      const w = parseFloat(s.weight) || 0;
+      const r = parseInt(s.reps, 10) || 0;
+      const vol = w * r;
+      const setDate = s.date || s.created_at?.slice(0, 10) || null;
+
+      if (w > maxWeight) {
+        maxWeight = w;
+        bestReps = r;
+        if (setDate) prDate = setDate;
+      } else if (w === maxWeight && r > bestReps) {
+        bestReps = r;
+        if (setDate) prDate = setDate;
+      }
+
+      if (vol > highestSetVolume) {
+        highestSetVolume = vol;
+      }
+
+      if (s.session_id) {
+        sessionVolumeMap[s.session_id] = (sessionVolumeMap[s.session_id] || 0) + vol;
+      }
+    });
+
+    const highestSessionVolume = Object.values(sessionVolumeMap).length > 0
+      ? Math.max(...Object.values(sessionVolumeMap))
+      : 0;
+
+    prList.push({
+      id: exId,
+      name: meta.name,
+      muscleGroup: meta.muscleGroup,
+      maxWeight,
+      bestReps,
+      highestSetVolume,
+      highestSessionVolume,
+      prDate: prDate || "Recorded",
+      totalSetsLogged: sets.length
+    });
+  });
+
+  return prList;
+}
+
+export function getExerciseHistory(allSets, allSessions, exerciseId) {
+  if (!Array.isArray(allSets) || !exerciseId) return [];
+
+  const relevantSets = allSets.filter(s => s.exercise_id === exerciseId && s.completed !== false);
+  if (relevantSets.length === 0) return [];
+
+  const sessionsMap = {};
+  if (Array.isArray(allSessions)) {
+    allSessions.forEach(s => { sessionsMap[s.id] = s; });
+  }
+
+  const groupedBySession = {};
+
+  relevantSets.forEach(s => {
+    const sId = s.session_id || "standalone";
+    if (!groupedBySession[sId]) {
+      const sessionObj = sessionsMap[sId] || {};
+      groupedBySession[sId] = {
+        sessionId: sId,
+        date: sessionObj.date || sessionObj.workout_date || s.date || s.created_at?.slice(0, 10) || "Unknown Date",
+        splitTitle: sessionObj.split_title || sessionObj.day_name || "Workout Session",
+        sets: []
+      };
+    }
+    groupedBySession[sId].sets.push(s);
+  });
+
+  const historyList = Object.values(groupedBySession).map(group => {
+    group.sets.sort((a, b) => (a.set_number || 0) - (b.set_number || 0));
+    const totalVolume = group.sets.reduce((acc, st) => acc + calculateSetVolume(st), 0);
+    const totalReps = group.sets.reduce((acc, st) => acc + (parseInt(st.reps, 10) || 0), 0);
+    const maxWeight = Math.max(...group.sets.map(st => parseFloat(st.weight) || 0));
+    return {
+      ...group,
+      totalVolume,
+      totalReps,
+      maxWeight
+    };
+  });
+
+  historyList.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  return historyList;
+}
+
+export function getExerciseProgressionTimeline(allSets, allSessions, exerciseId) {
+  const history = getExerciseHistory(allSets, allSessions, exerciseId);
+  return history.reverse().map(item => ({
+    date: item.date,
+    maxWeight: item.maxWeight,
+    totalVolume: item.totalVolume,
+    totalReps: item.totalReps,
+    setsCount: item.sets.length
+  }));
+}
+

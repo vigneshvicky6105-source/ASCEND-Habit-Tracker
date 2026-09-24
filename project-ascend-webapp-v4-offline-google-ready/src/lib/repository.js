@@ -132,15 +132,15 @@ export const SOLOMON_WORKOUT_TEMPLATE = [
     focus: "Chest & Triceps",
     isRest: false,
     exercises: [
-      { id: "solomon-mon-ex-1", name: "Bench Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/8", defaultWeight: 60 },
-      { id: "solomon-mon-ex-2", name: "Incline DB Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/8", defaultWeight: 22 },
-      { id: "solomon-mon-ex-3", name: "Machine Chest Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/10", defaultWeight: 50 },
-      { id: "solomon-mon-ex-4", name: "Cable Chest Fly", muscleGroup: "Chest", targetSets: 3, targetReps: "15/15/12", defaultWeight: 15 },
-      { id: "solomon-mon-ex-5", name: "Push-ups", muscleGroup: "Chest", targetSets: 2, targetReps: "20/15", defaultWeight: 0 },
-      { id: "solomon-mon-ex-6", name: "Cable Rope Pushdown", muscleGroup: "Triceps", targetSets: 3, targetReps: "15/12/12", defaultWeight: 25 },
-      { id: "solomon-mon-ex-7", name: "Skull Crushers", muscleGroup: "Triceps", targetSets: 3, targetReps: "12/10/10", defaultWeight: 30 },
-      { id: "solomon-mon-ex-8", name: "Single-arm Overhead Ext", muscleGroup: "Triceps", targetSets: 2, targetReps: "15/12", defaultWeight: 10 },
-      { id: "solomon-mon-ex-9", name: "Dips", muscleGroup: "Triceps", targetSets: 2, targetReps: "12/10", defaultWeight: 0 }
+      { id: "solomon-mon-ex-1", name: "Bench Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/8", defaultWeight: 60, optional: false, active: true },
+      { id: "solomon-mon-ex-2", name: "Incline DB Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/8", defaultWeight: 22, optional: false, active: true },
+      { id: "solomon-mon-ex-3", name: "Machine Chest Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/10", defaultWeight: 50, optional: false, active: true },
+      { id: "solomon-mon-ex-4", name: "Cable Chest Fly", muscleGroup: "Chest", targetSets: 3, targetReps: "15/15/12", defaultWeight: 15, optional: false, active: true },
+      { id: "solomon-mon-ex-5", name: "Push-ups (Finisher)", muscleGroup: "Chest", targetSets: 2, targetReps: "20/15", defaultWeight: 0, optional: false, active: true },
+      { id: "solomon-mon-ex-6", name: "Cable Rope Pushdown", muscleGroup: "Triceps", targetSets: 3, targetReps: "15/12/12", defaultWeight: 25, optional: false, active: true },
+      { id: "solomon-mon-ex-7", name: "Skull Crushers", muscleGroup: "Triceps", targetSets: 3, targetReps: "12/10/10", defaultWeight: 30, optional: false, active: true },
+      { id: "solomon-mon-ex-8", name: "Single-arm Overhead Extension", muscleGroup: "Triceps", targetSets: 2, targetReps: "15/12", defaultWeight: 10, optional: false, active: true },
+      { id: "solomon-mon-ex-9", name: "Dips", muscleGroup: "Triceps", targetSets: 2, targetReps: "12/10", defaultWeight: 0, optional: false, active: true }
     ]
   },
   {
@@ -150,15 +150,15 @@ export const SOLOMON_WORKOUT_TEMPLATE = [
     focus: "Back & Biceps",
     isRest: false,
     exercises: [
-      { id: "solomon-tue-ex-1", name: "Lat Pulldown Wide", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/8", defaultWeight: 55 },
-      { id: "solomon-tue-ex-2", name: "Single-arm Lat Pulldown", muscleGroup: "Back", targetSets: 2, targetReps: "12/12", defaultWeight: 20 },
-      { id: "solomon-tue-ex-3", name: "Seated Cable Row", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/10", defaultWeight: 50 },
-      { id: "solomon-tue-ex-4", name: "Chest-supported Row", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/8", defaultWeight: 45 },
-      { id: "solomon-tue-ex-5", name: "Straight-arm Pulldown", muscleGroup: "Back", targetSets: 2, targetReps: "15/15", defaultWeight: 20 },
-      { id: "solomon-tue-ex-6", name: "Barbell Curl", muscleGroup: "Biceps", targetSets: 3, targetReps: "12/10/8", defaultWeight: 25 },
-      { id: "solomon-tue-ex-7", name: "DB Alt Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "12/10", defaultWeight: 12 },
-      { id: "solomon-tue-ex-8", name: "Preacher Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "15/12", defaultWeight: 20 },
-      { id: "solomon-tue-ex-9", name: "Hammer Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "12/12", defaultWeight: 14 }
+      { id: "solomon-tue-ex-1", name: "Lat Pulldown (Wide)", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/8", defaultWeight: 55, optional: false, active: true },
+      { id: "solomon-tue-ex-2", name: "Single-arm Lat Pulldown", muscleGroup: "Back", targetSets: 2, targetReps: "12/12", defaultWeight: 20, optional: false, active: true },
+      { id: "solomon-tue-ex-3", name: "Seated Cable Row", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/10", defaultWeight: 50, optional: false, active: true },
+      { id: "solomon-tue-ex-4", name: "Chest-supported Row", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/8", defaultWeight: 45, optional: false, active: true },
+      { id: "solomon-tue-ex-5", name: "Straight-arm Pulldown", muscleGroup: "Back", targetSets: 2, targetReps: "15/15", defaultWeight: 20, optional: false, active: true },
+      { id: "solomon-tue-ex-6", name: "Barbell Curl", muscleGroup: "Biceps", targetSets: 3, targetReps: "12/10/8", defaultWeight: 25, optional: false, active: true },
+      { id: "solomon-tue-ex-7", name: "DB Alternating Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "12/10", defaultWeight: 12, optional: false, active: true },
+      { id: "solomon-tue-ex-8", name: "Preacher Curl (Machine)", muscleGroup: "Biceps", targetSets: 2, targetReps: "15/12", defaultWeight: 20, optional: false, active: true },
+      { id: "solomon-tue-ex-9", name: "Hammer Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "12/12", defaultWeight: 14, optional: false, active: true }
     ]
   },
   {
@@ -168,15 +168,15 @@ export const SOLOMON_WORKOUT_TEMPLATE = [
     focus: "Shoulders & Legs",
     isRest: false,
     exercises: [
-      { id: "solomon-wed-ex-1", name: "Seated Shoulder Press", muscleGroup: "Shoulders", targetSets: 3, targetReps: "12/10/8", defaultWeight: 20 },
-      { id: "solomon-wed-ex-2", name: "Lateral Raises", muscleGroup: "Shoulders", targetSets: 3, targetReps: "15/15/12", defaultWeight: 10 },
-      { id: "solomon-wed-ex-3", name: "Rear Delt Fly", muscleGroup: "Shoulders", targetSets: 2, targetReps: "15/15", defaultWeight: 8 },
-      { id: "solomon-wed-ex-4", name: "Front Raises", muscleGroup: "Shoulders", targetSets: 2, targetReps: "12/12", defaultWeight: 10 },
-      { id: "solomon-wed-ex-5", name: "Leg Press", muscleGroup: "Legs", targetSets: 3, targetReps: "15/12/10", defaultWeight: 120 },
-      { id: "solomon-wed-ex-6", name: "Hack Squat/Smith Squat", muscleGroup: "Legs", targetSets: 3, targetReps: "12/10/8", defaultWeight: 60 },
-      { id: "solomon-wed-ex-7", name: "Leg Extension", muscleGroup: "Legs", targetSets: 3, targetReps: "15/15/12", defaultWeight: 45 },
-      { id: "solomon-wed-ex-8", name: "Hamstring Curl", muscleGroup: "Legs", targetSets: 3, targetReps: "15/12/12", defaultWeight: 40 },
-      { id: "solomon-wed-ex-9", name: "Standing Calf Raises", muscleGroup: "Legs", targetSets: 3, targetReps: "15/12/10", defaultWeight: 50 }
+      { id: "solomon-wed-ex-1", name: "Seated Shoulder Press", muscleGroup: "Shoulders", targetSets: 3, targetReps: "12/10/8", defaultWeight: 20, optional: false, active: true },
+      { id: "solomon-wed-ex-2", name: "Lateral Raises", muscleGroup: "Shoulders", targetSets: 3, targetReps: "15/15/12", defaultWeight: 10, optional: false, active: true },
+      { id: "solomon-wed-ex-3", name: "Rear Delt Fly (Machine)", muscleGroup: "Shoulders", targetSets: 2, targetReps: "15/15", defaultWeight: 8, optional: false, active: true },
+      { id: "solomon-wed-ex-4", name: "Front Raises", muscleGroup: "Shoulders", targetSets: 2, targetReps: "12/12", defaultWeight: 10, optional: false, active: true },
+      { id: "solomon-wed-ex-5", name: "Leg Press", muscleGroup: "Legs", targetSets: 3, targetReps: "15/12/10", defaultWeight: 120, optional: false, active: true },
+      { id: "solomon-wed-ex-6", name: "Hack Squat / Smith Squat", muscleGroup: "Legs", targetSets: 3, targetReps: "12/10/8", defaultWeight: 60, optional: false, active: true },
+      { id: "solomon-wed-ex-7", name: "Leg Extension", muscleGroup: "Legs", targetSets: 3, targetReps: "15/15/12", defaultWeight: 45, optional: false, active: true },
+      { id: "solomon-wed-ex-8", name: "Hamstring Curl", muscleGroup: "Legs", targetSets: 3, targetReps: "15/12/12", defaultWeight: 40, optional: false, active: true },
+      { id: "solomon-wed-ex-9", name: "Standing Calf Raises", muscleGroup: "Legs", targetSets: 3, targetReps: "15/12/10", defaultWeight: 50, optional: false, active: true }
     ]
   },
   {
@@ -186,15 +186,15 @@ export const SOLOMON_WORKOUT_TEMPLATE = [
     focus: "Chest & Triceps",
     isRest: false,
     exercises: [
-      { id: "solomon-thu-ex-1", name: "Incline Smith Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/8", defaultWeight: 50 },
-      { id: "solomon-thu-ex-2", name: "Decline Machine Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/10", defaultWeight: 55 },
-      { id: "solomon-thu-ex-3", name: "Cable Crossover Lower", muscleGroup: "Chest", targetSets: 2, targetReps: "15/15", defaultWeight: 12.5 },
-      { id: "solomon-thu-ex-4", name: "Pec Deck Fly", muscleGroup: "Chest", targetSets: 2, targetReps: "15/12", defaultWeight: 45 },
-      { id: "solomon-thu-ex-5", name: "Push-ups", muscleGroup: "Chest", targetSets: 2, targetReps: "20/20", defaultWeight: 0 },
-      { id: "solomon-thu-ex-6", name: "Rope Overhead Ext", muscleGroup: "Triceps", targetSets: 3, targetReps: "15/12/12", defaultWeight: 20 },
-      { id: "solomon-thu-ex-7", name: "Close-grip Bench/Smith", muscleGroup: "Triceps", targetSets: 3, targetReps: "12/10/8", defaultWeight: 40 },
-      { id: "solomon-thu-ex-8", name: "Tricep Kickback", muscleGroup: "Triceps", targetSets: 2, targetReps: "15/12", defaultWeight: 8 },
-      { id: "solomon-thu-ex-9", name: "Reverse Grip Pushdowns", muscleGroup: "Triceps", targetSets: 2, targetReps: "15/12", defaultWeight: 20 }
+      { id: "solomon-thu-ex-1", name: "Incline Smith Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/8", defaultWeight: 50, optional: false, active: true },
+      { id: "solomon-thu-ex-2", name: "Decline Machine Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/10", defaultWeight: 55, optional: false, active: true },
+      { id: "solomon-thu-ex-3", name: "Cable Crossover (Lower Chest)", muscleGroup: "Chest", targetSets: 2, targetReps: "15/15", defaultWeight: 12.5, optional: false, active: true },
+      { id: "solomon-thu-ex-4", name: "Pec Deck Fly", muscleGroup: "Chest", targetSets: 2, targetReps: "15/12", defaultWeight: 45, optional: false, active: true },
+      { id: "solomon-thu-ex-5", name: "Push-ups", muscleGroup: "Chest", targetSets: 2, targetReps: "20/20", defaultWeight: 0, optional: false, active: true },
+      { id: "solomon-thu-ex-6", name: "Rope Overhead Extension", muscleGroup: "Triceps", targetSets: 3, targetReps: "15/12/12", defaultWeight: 20, optional: false, active: true },
+      { id: "solomon-thu-ex-7", name: "Close-grip Bench / Smith", muscleGroup: "Triceps", targetSets: 3, targetReps: "12/10/8", defaultWeight: 40, optional: false, active: true },
+      { id: "solomon-thu-ex-8", name: "Tricep Kickback", muscleGroup: "Triceps", targetSets: 2, targetReps: "15/12", defaultWeight: 8, optional: false, active: true },
+      { id: "solomon-thu-ex-9", name: "Reverse Grip Pushdowns", muscleGroup: "Triceps", targetSets: 2, targetReps: "15/12", defaultWeight: 20, optional: false, active: true }
     ]
   },
   {
@@ -204,15 +204,15 @@ export const SOLOMON_WORKOUT_TEMPLATE = [
     focus: "Back & Biceps",
     isRest: false,
     exercises: [
-      { id: "solomon-fri-ex-1", name: "Neutral-grip Pulldown", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/8", defaultWeight: 55 },
-      { id: "solomon-fri-ex-2", name: "T-bar Row", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/8", defaultWeight: 40 },
-      { id: "solomon-fri-ex-3", name: "Unilateral Cable Row", muscleGroup: "Back", targetSets: 2, targetReps: "12/12", defaultWeight: 22.5 },
-      { id: "solomon-fri-ex-4", name: "Machine Row Wide", muscleGroup: "Back", targetSets: 2, targetReps: "12/10", defaultWeight: 50 },
-      { id: "solomon-fri-ex-5", name: "Rope Pullovers", muscleGroup: "Back", targetSets: 2, targetReps: "15/15", defaultWeight: 25 },
-      { id: "solomon-fri-ex-6", name: "EZ-bar Curl", muscleGroup: "Biceps", targetSets: 3, targetReps: "12/10/8", defaultWeight: 25 },
-      { id: "solomon-fri-ex-7", name: "Incline DB Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "12/10", defaultWeight: 12 },
-      { id: "solomon-fri-ex-8", name: "Cable Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "15/12", defaultWeight: 20 },
-      { id: "solomon-fri-ex-9", name: "Reverse Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "12/12", defaultWeight: 15 }
+      { id: "solomon-fri-ex-1", name: "Neutral-grip Pulldown", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/8", defaultWeight: 55, optional: false, active: true },
+      { id: "solomon-fri-ex-2", name: "T-bar Row", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/8", defaultWeight: 40, optional: false, active: true },
+      { id: "solomon-fri-ex-3", name: "Unilateral Cable Row", muscleGroup: "Back", targetSets: 2, targetReps: "12/12", defaultWeight: 22.5, optional: false, active: true },
+      { id: "solomon-fri-ex-4", name: "Machine Row (Wide Chest Supported)", muscleGroup: "Back", targetSets: 2, targetReps: "12/10", defaultWeight: 50, optional: false, active: true },
+      { id: "solomon-fri-ex-5", name: "Rope Pullovers", muscleGroup: "Back", targetSets: 2, targetReps: "15/15", defaultWeight: 25, optional: false, active: true },
+      { id: "solomon-fri-ex-6", name: "EZ-bar Curl", muscleGroup: "Biceps", targetSets: 3, targetReps: "12/10/8", defaultWeight: 25, optional: false, active: true },
+      { id: "solomon-fri-ex-7", name: "Incline DB Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "12/10", defaultWeight: 12, optional: false, active: true },
+      { id: "solomon-fri-ex-8", name: "Cable Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "15/12", defaultWeight: 20, optional: false, active: true },
+      { id: "solomon-fri-ex-9", name: "Reverse Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "12/12", defaultWeight: 15, optional: false, active: true }
     ]
   },
   {
@@ -222,16 +222,16 @@ export const SOLOMON_WORKOUT_TEMPLATE = [
     focus: "Shoulders & Legs",
     isRest: false,
     exercises: [
-      { id: "solomon-sat-ex-1", name: "Standing OHP", muscleGroup: "Shoulders", targetSets: 3, targetReps: "12/10/8", defaultWeight: 35 },
-      { id: "solomon-sat-ex-2", name: "Cable Lateral Raise", muscleGroup: "Shoulders", targetSets: 3, targetReps: "15/15/12", defaultWeight: 7.5 },
-      { id: "solomon-sat-ex-3", name: "Reverse Pec Deck", muscleGroup: "Shoulders", targetSets: 2, targetReps: "15/15", defaultWeight: 35 },
-      { id: "solomon-sat-ex-4", name: "DB Upright Row", muscleGroup: "Shoulders", targetSets: 2, targetReps: "12/10", defaultWeight: 14 },
-      { id: "solomon-sat-ex-5", name: "Arnold Press", muscleGroup: "Shoulders", targetSets: 2, targetReps: "15/12", defaultWeight: 16 },
-      { id: "solomon-sat-ex-6", name: "Barbell Squat/Smith Squat", muscleGroup: "Legs", targetSets: 3, targetReps: "12/10/8", defaultWeight: 70 },
-      { id: "solomon-sat-ex-7", name: "Bulgarian Split Squat", muscleGroup: "Legs", targetSets: 2, targetReps: "12/12", defaultWeight: 16 },
-      { id: "solomon-sat-ex-8", name: "Leg Extension Slow", muscleGroup: "Legs", targetSets: 2, targetReps: "15/15", defaultWeight: 40 },
-      { id: "solomon-sat-ex-9", name: "RDL/DB Deadlift", muscleGroup: "Legs", targetSets: 3, targetReps: "12/10/10", defaultWeight: 60 },
-      { id: "solomon-sat-ex-10", name: "Seated Calf Raises", muscleGroup: "Legs", targetSets: 2, targetReps: "15/15", defaultWeight: 40 }
+      { id: "solomon-sat-ex-1", name: "Standing OHP", muscleGroup: "Shoulders", targetSets: 3, targetReps: "12/10/8", defaultWeight: 35, optional: false, active: true },
+      { id: "solomon-sat-ex-2", name: "Cable Lateral Raise", muscleGroup: "Shoulders", targetSets: 3, targetReps: "15/15/12", defaultWeight: 7.5, optional: false, active: true },
+      { id: "solomon-sat-ex-3", name: "Reverse Pec Deck", muscleGroup: "Shoulders", targetSets: 2, targetReps: "15/15", defaultWeight: 35, optional: false, active: true },
+      { id: "solomon-sat-ex-4", name: "DB Upright Row", muscleGroup: "Shoulders", targetSets: 2, targetReps: "12/10", defaultWeight: 14, optional: false, active: true },
+      { id: "solomon-sat-ex-5", name: "Arnold Press", muscleGroup: "Shoulders", targetSets: 2, targetReps: "15/12", defaultWeight: 16, optional: true, active: true },
+      { id: "solomon-sat-ex-6", name: "Barbell Squat / Smith Squat", muscleGroup: "Legs", targetSets: 3, targetReps: "12/10/8", defaultWeight: 70, optional: false, active: true },
+      { id: "solomon-sat-ex-7", name: "Bulgarian Split Squat", muscleGroup: "Legs", targetSets: 2, targetReps: "12/12", defaultWeight: 16, optional: false, active: true },
+      { id: "solomon-sat-ex-8", name: "Leg Extension (Slow Reps)", muscleGroup: "Legs", targetSets: 2, targetReps: "15/15", defaultWeight: 40, optional: false, active: true },
+      { id: "solomon-sat-ex-9", name: "RDL / DB Deadlift", muscleGroup: "Legs", targetSets: 3, targetReps: "12/10/10", defaultWeight: 60, optional: false, active: true },
+      { id: "solomon-sat-ex-10", name: "Seated Calf Raises", muscleGroup: "Legs", targetSets: 2, targetReps: "15/15", defaultWeight: 40, optional: false, active: true }
     ]
   },
   {
@@ -1070,6 +1070,96 @@ class AscendRepository {
       ...currentFitness,
       routine: updatedRoutine
     }, user);
+  }
+
+  async editProgramExercise(exerciseId, updatedFields, user) {
+    const currentFitness = this.state.fitness || { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] };
+    const routine = (currentFitness.routine || SOLOMON_WORKOUT_TEMPLATE).map(day => ({
+      ...day,
+      exercises: (day.exercises || []).map(ex => {
+        if (ex.id === exerciseId) {
+          return { ...ex, ...updatedFields };
+        }
+        return ex;
+      })
+    }));
+    await this.saveWorkoutRoutine(routine, user);
+  }
+
+  async addProgramExercise(dayName, newExercise, user) {
+    const currentFitness = this.state.fitness || { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] };
+    const exRecord = {
+      id: generateUUID(),
+      name: newExercise.name,
+      muscleGroup: newExercise.muscleGroup || "Other",
+      targetSets: parseInt(newExercise.targetSets, 10) || 3,
+      targetReps: newExercise.targetReps || "10",
+      defaultWeight: parseFloat(newExercise.defaultWeight) || 0,
+      optional: !!newExercise.optional,
+      active: true
+    };
+    const routine = (currentFitness.routine || SOLOMON_WORKOUT_TEMPLATE).map(day => {
+      if (day.day.toLowerCase() === dayName.toLowerCase()) {
+        return {
+          ...day,
+          exercises: [...(day.exercises || []), exRecord]
+        };
+      }
+      return day;
+    });
+    await this.saveWorkoutRoutine(routine, user);
+  }
+
+  async deleteProgramExercise(exerciseId, user) {
+    const currentFitness = this.state.fitness || { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] };
+    const routine = (currentFitness.routine || SOLOMON_WORKOUT_TEMPLATE).map(day => ({
+      ...day,
+      exercises: (day.exercises || []).filter(ex => ex.id !== exerciseId)
+    }));
+    await this.saveWorkoutRoutine(routine, user);
+  }
+
+  async moveProgramExercise(exerciseId, targetDayName, user) {
+    const currentFitness = this.state.fitness || { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] };
+    let targetExercise = null;
+
+    const routineWithoutEx = (currentFitness.routine || SOLOMON_WORKOUT_TEMPLATE).map(day => {
+      const found = (day.exercises || []).find(ex => ex.id === exerciseId);
+      if (found) targetExercise = found;
+      return {
+        ...day,
+        exercises: (day.exercises || []).filter(ex => ex.id !== exerciseId)
+      };
+    });
+
+    if (!targetExercise) return;
+
+    const finalRoutine = routineWithoutEx.map(day => {
+      if (day.day.toLowerCase() === targetDayName.toLowerCase()) {
+        return {
+          ...day,
+          exercises: [...(day.exercises || []), targetExercise]
+        };
+      }
+      return day;
+    });
+
+    await this.saveWorkoutRoutine(finalRoutine, user);
+  }
+
+  async reorderProgramExercises(dayName, fromIndex, toIndex, user) {
+    const currentFitness = this.state.fitness || { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] };
+    const routine = (currentFitness.routine || SOLOMON_WORKOUT_TEMPLATE).map(day => {
+      if (day.day.toLowerCase() === dayName.toLowerCase()) {
+        const exercises = [...(day.exercises || [])];
+        if (fromIndex < 0 || fromIndex >= exercises.length || toIndex < 0 || toIndex >= exercises.length) return day;
+        const [moved] = exercises.splice(fromIndex, 1);
+        exercises.splice(toIndex, 0, moved);
+        return { ...day, exercises };
+      }
+      return day;
+    });
+    await this.saveWorkoutRoutine(routine, user);
   }
 
   async saveChallenge(challengeData, user) {

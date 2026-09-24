@@ -4,6 +4,7 @@ import { subscribeRealtimeSync, unsubscribeRealtimeSync } from "./lib/realtime";
 import { syncEngine, SYNC_STATES } from "./lib/syncEngine";
 import { supabase } from "./lib/supabase";
 import { SyncDiagnosticsPanel } from "./components/SyncDiagnosticsPanel";
+import { FitnessModule } from "./components/FitnessModule";
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -678,6 +679,14 @@ function App() {
         </button>
 
         <button
+          className={`bottomNavItem ${tab === "fitness" ? "active" : ""}`}
+          onClick={() => setTab("fitness")}
+        >
+          <Dumbbell size={20} />
+          <span>Fitness</span>
+        </button>
+
+        <button
           className={`bottomNavItem ${tab === "progress" || tab === "analytics" ? "active" : ""}`}
           onClick={() => setTab("progress")}
         >
@@ -762,6 +771,13 @@ function App() {
         />
       )}
 
+      {tab === "fitness" && (
+        <FitnessModule
+          fitness={local.fitness || { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] }}
+          user={user}
+        />
+      )}
+
       {(tab === "progress" || tab === "analytics") && (
         <main className="viewContainer fade-in">
           {/* PROGRESS SUB-TAB NAVIGATION PILLS */}
@@ -841,6 +857,12 @@ function App() {
           )}
 
           {progressSubTab === "fitness" && (
+            <FitnessModule
+              fitness={local.fitness || { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] }}
+              user={user}
+            />
+          )}
+          {false && (
             <FitnessView
               user={user}
               fitness={local.fitness || { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] }}
