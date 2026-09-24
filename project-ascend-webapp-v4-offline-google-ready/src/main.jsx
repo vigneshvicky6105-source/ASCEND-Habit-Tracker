@@ -195,6 +195,16 @@ function App() {
   const [nutritionModal, setNutritionModal] = useState(null);
   const [workoutModal, setWorkoutModal] = useState(null);
 
+  // SubTab Navigation States
+  const [questSubTab, setQuestSubTab] = useState("main");
+  const [progressSubTab, setProgressSubTab] = useState("analytics");
+  const [duesSubTab, setDuesSubTab] = useState("lent");
+  const [fitnessSubTab, setFitnessSubTab] = useState("weight");
+
+  // Settings & Notification States
+  const [geminiKey, setGeminiKey] = useState(() => typeof localStorage !== "undefined" ? localStorage.getItem("ascend_gemini_key") || "" : "");
+  const [notifPermission, setNotifPermission] = useState(() => typeof Notification !== "undefined" ? Notification.permission : "default");
+
   const [local, setLocal, localReady, activeUserId] = useAscendStore(user, authLoading);
 
   // --- SUPABASE AUTHENTICATION INITIALIZATION ---
@@ -423,6 +433,52 @@ function App() {
   const deleteDue = (dueId) => {
     if (confirm("Delete this due entry?")) {
       repository.deleteDue(dueId, user);
+    }
+  };
+
+  const requestNotificationPermission = async () => {
+    if (typeof Notification !== "undefined") {
+      const perm = await Notification.requestPermission();
+      setNotifPermission(perm);
+    }
+  };
+
+  const syncWithCloud = async () => {
+    if (user) {
+      await repository.reconcileCloud(user);
+    }
+  };
+
+  const saveWeightEntry = (entryData) => {
+    repository.saveFitnessLog("weight", entryData, user);
+    setWeightModal(null);
+  };
+
+  const deleteWeightEntry = (id) => {
+    if (confirm("Delete this weight log?")) {
+      repository.deleteFitnessLog("weight", id, user);
+    }
+  };
+
+  const saveNutritionEntry = (entryData) => {
+    repository.saveFitnessLog("nutrition", entryData, user);
+    setNutritionModal(null);
+  };
+
+  const deleteNutritionEntry = (id) => {
+    if (confirm("Delete this nutrition log?")) {
+      repository.deleteFitnessLog("nutrition", id, user);
+    }
+  };
+
+  const saveWorkoutEntry = (entryData) => {
+    repository.saveFitnessLog("workout", entryData, user);
+    setWorkoutModal(null);
+  };
+
+  const deleteWorkoutEntry = (id) => {
+    if (confirm("Delete this workout log?")) {
+      repository.deleteFitnessLog("workout", id, user);
     }
   };
 
