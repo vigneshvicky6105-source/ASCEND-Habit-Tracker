@@ -124,6 +124,126 @@ export const STARTER_CHALLENGES = [
   { id: "ch-3", title: "Apply to 30 Tech Jobs", category: "Career", targetDays: 30, completedDays: 15, rewardXp: 400, active: true }
 ];
 
+export const SOLOMON_WORKOUT_TEMPLATE = [
+  {
+    day: "Monday",
+    title: "CHEST + TRICEPS",
+    subtitle: "Push Hypertrophy",
+    focus: "Chest & Triceps",
+    isRest: false,
+    exercises: [
+      { id: "solomon-mon-ex-1", name: "Bench Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/8", defaultWeight: 60 },
+      { id: "solomon-mon-ex-2", name: "Incline DB Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/8", defaultWeight: 22 },
+      { id: "solomon-mon-ex-3", name: "Machine Chest Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/10", defaultWeight: 50 },
+      { id: "solomon-mon-ex-4", name: "Cable Chest Fly", muscleGroup: "Chest", targetSets: 3, targetReps: "15/15/12", defaultWeight: 15 },
+      { id: "solomon-mon-ex-5", name: "Push-ups", muscleGroup: "Chest", targetSets: 2, targetReps: "20/15", defaultWeight: 0 },
+      { id: "solomon-mon-ex-6", name: "Cable Rope Pushdown", muscleGroup: "Triceps", targetSets: 3, targetReps: "15/12/12", defaultWeight: 25 },
+      { id: "solomon-mon-ex-7", name: "Skull Crushers", muscleGroup: "Triceps", targetSets: 3, targetReps: "12/10/10", defaultWeight: 30 },
+      { id: "solomon-mon-ex-8", name: "Single-arm Overhead Ext", muscleGroup: "Triceps", targetSets: 2, targetReps: "15/12", defaultWeight: 10 },
+      { id: "solomon-mon-ex-9", name: "Dips", muscleGroup: "Triceps", targetSets: 2, targetReps: "12/10", defaultWeight: 0 }
+    ]
+  },
+  {
+    day: "Tuesday",
+    title: "BACK + BICEPS",
+    subtitle: "Pull Hypertrophy",
+    focus: "Back & Biceps",
+    isRest: false,
+    exercises: [
+      { id: "solomon-tue-ex-1", name: "Lat Pulldown Wide", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/8", defaultWeight: 55 },
+      { id: "solomon-tue-ex-2", name: "Single-arm Lat Pulldown", muscleGroup: "Back", targetSets: 2, targetReps: "12/12", defaultWeight: 20 },
+      { id: "solomon-tue-ex-3", name: "Seated Cable Row", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/10", defaultWeight: 50 },
+      { id: "solomon-tue-ex-4", name: "Chest-supported Row", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/8", defaultWeight: 45 },
+      { id: "solomon-tue-ex-5", name: "Straight-arm Pulldown", muscleGroup: "Back", targetSets: 2, targetReps: "15/15", defaultWeight: 20 },
+      { id: "solomon-tue-ex-6", name: "Barbell Curl", muscleGroup: "Biceps", targetSets: 3, targetReps: "12/10/8", defaultWeight: 25 },
+      { id: "solomon-tue-ex-7", name: "DB Alt Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "12/10", defaultWeight: 12 },
+      { id: "solomon-tue-ex-8", name: "Preacher Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "15/12", defaultWeight: 20 },
+      { id: "solomon-tue-ex-9", name: "Hammer Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "12/12", defaultWeight: 14 }
+    ]
+  },
+  {
+    day: "Wednesday",
+    title: "SHOULDERS + LEGS",
+    subtitle: "Delts & Lower Body",
+    focus: "Shoulders & Legs",
+    isRest: false,
+    exercises: [
+      { id: "solomon-wed-ex-1", name: "Seated Shoulder Press", muscleGroup: "Shoulders", targetSets: 3, targetReps: "12/10/8", defaultWeight: 20 },
+      { id: "solomon-wed-ex-2", name: "Lateral Raises", muscleGroup: "Shoulders", targetSets: 3, targetReps: "15/15/12", defaultWeight: 10 },
+      { id: "solomon-wed-ex-3", name: "Rear Delt Fly", muscleGroup: "Shoulders", targetSets: 2, targetReps: "15/15", defaultWeight: 8 },
+      { id: "solomon-wed-ex-4", name: "Front Raises", muscleGroup: "Shoulders", targetSets: 2, targetReps: "12/12", defaultWeight: 10 },
+      { id: "solomon-wed-ex-5", name: "Leg Press", muscleGroup: "Legs", targetSets: 3, targetReps: "15/12/10", defaultWeight: 120 },
+      { id: "solomon-wed-ex-6", name: "Hack Squat/Smith Squat", muscleGroup: "Legs", targetSets: 3, targetReps: "12/10/8", defaultWeight: 60 },
+      { id: "solomon-wed-ex-7", name: "Leg Extension", muscleGroup: "Legs", targetSets: 3, targetReps: "15/15/12", defaultWeight: 45 },
+      { id: "solomon-wed-ex-8", name: "Hamstring Curl", muscleGroup: "Legs", targetSets: 3, targetReps: "15/12/12", defaultWeight: 40 },
+      { id: "solomon-wed-ex-9", name: "Standing Calf Raises", muscleGroup: "Legs", targetSets: 3, targetReps: "15/12/10", defaultWeight: 50 }
+    ]
+  },
+  {
+    day: "Thursday",
+    title: "CHEST + TRICEPS (Different Stimulus)",
+    subtitle: "Push Variation",
+    focus: "Chest & Triceps",
+    isRest: false,
+    exercises: [
+      { id: "solomon-thu-ex-1", name: "Incline Smith Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/8", defaultWeight: 50 },
+      { id: "solomon-thu-ex-2", name: "Decline Machine Press", muscleGroup: "Chest", targetSets: 3, targetReps: "12/10/10", defaultWeight: 55 },
+      { id: "solomon-thu-ex-3", name: "Cable Crossover Lower", muscleGroup: "Chest", targetSets: 2, targetReps: "15/15", defaultWeight: 12.5 },
+      { id: "solomon-thu-ex-4", name: "Pec Deck Fly", muscleGroup: "Chest", targetSets: 2, targetReps: "15/12", defaultWeight: 45 },
+      { id: "solomon-thu-ex-5", name: "Push-ups", muscleGroup: "Chest", targetSets: 2, targetReps: "20/20", defaultWeight: 0 },
+      { id: "solomon-thu-ex-6", name: "Rope Overhead Ext", muscleGroup: "Triceps", targetSets: 3, targetReps: "15/12/12", defaultWeight: 20 },
+      { id: "solomon-thu-ex-7", name: "Close-grip Bench/Smith", muscleGroup: "Triceps", targetSets: 3, targetReps: "12/10/8", defaultWeight: 40 },
+      { id: "solomon-thu-ex-8", name: "Tricep Kickback", muscleGroup: "Triceps", targetSets: 2, targetReps: "15/12", defaultWeight: 8 },
+      { id: "solomon-thu-ex-9", name: "Reverse Grip Pushdowns", muscleGroup: "Triceps", targetSets: 2, targetReps: "15/12", defaultWeight: 20 }
+    ]
+  },
+  {
+    day: "Friday",
+    title: "BACK + BICEPS (Different Angles)",
+    subtitle: "Pull Variation",
+    focus: "Back & Biceps",
+    isRest: false,
+    exercises: [
+      { id: "solomon-fri-ex-1", name: "Neutral-grip Pulldown", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/8", defaultWeight: 55 },
+      { id: "solomon-fri-ex-2", name: "T-bar Row", muscleGroup: "Back", targetSets: 3, targetReps: "12/10/8", defaultWeight: 40 },
+      { id: "solomon-fri-ex-3", name: "Unilateral Cable Row", muscleGroup: "Back", targetSets: 2, targetReps: "12/12", defaultWeight: 22.5 },
+      { id: "solomon-fri-ex-4", name: "Machine Row Wide", muscleGroup: "Back", targetSets: 2, targetReps: "12/10", defaultWeight: 50 },
+      { id: "solomon-fri-ex-5", name: "Rope Pullovers", muscleGroup: "Back", targetSets: 2, targetReps: "15/15", defaultWeight: 25 },
+      { id: "solomon-fri-ex-6", name: "EZ-bar Curl", muscleGroup: "Biceps", targetSets: 3, targetReps: "12/10/8", defaultWeight: 25 },
+      { id: "solomon-fri-ex-7", name: "Incline DB Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "12/10", defaultWeight: 12 },
+      { id: "solomon-fri-ex-8", name: "Cable Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "15/12", defaultWeight: 20 },
+      { id: "solomon-fri-ex-9", name: "Reverse Curl", muscleGroup: "Biceps", targetSets: 2, targetReps: "12/12", defaultWeight: 15 }
+    ]
+  },
+  {
+    day: "Saturday",
+    title: "SHOULDERS + LEGS (Different Focus)",
+    subtitle: "Delts & Lower Body Focus",
+    focus: "Shoulders & Legs",
+    isRest: false,
+    exercises: [
+      { id: "solomon-sat-ex-1", name: "Standing OHP", muscleGroup: "Shoulders", targetSets: 3, targetReps: "12/10/8", defaultWeight: 35 },
+      { id: "solomon-sat-ex-2", name: "Cable Lateral Raise", muscleGroup: "Shoulders", targetSets: 3, targetReps: "15/15/12", defaultWeight: 7.5 },
+      { id: "solomon-sat-ex-3", name: "Reverse Pec Deck", muscleGroup: "Shoulders", targetSets: 2, targetReps: "15/15", defaultWeight: 35 },
+      { id: "solomon-sat-ex-4", name: "DB Upright Row", muscleGroup: "Shoulders", targetSets: 2, targetReps: "12/10", defaultWeight: 14 },
+      { id: "solomon-sat-ex-5", name: "Arnold Press", muscleGroup: "Shoulders", targetSets: 2, targetReps: "15/12", defaultWeight: 16 },
+      { id: "solomon-sat-ex-6", name: "Barbell Squat/Smith Squat", muscleGroup: "Legs", targetSets: 3, targetReps: "12/10/8", defaultWeight: 70 },
+      { id: "solomon-sat-ex-7", name: "Bulgarian Split Squat", muscleGroup: "Legs", targetSets: 2, targetReps: "12/12", defaultWeight: 16 },
+      { id: "solomon-sat-ex-8", name: "Leg Extension Slow", muscleGroup: "Legs", targetSets: 2, targetReps: "15/15", defaultWeight: 40 },
+      { id: "solomon-sat-ex-9", name: "RDL/DB Deadlift", muscleGroup: "Legs", targetSets: 3, targetReps: "12/10/10", defaultWeight: 60 },
+      { id: "solomon-sat-ex-10", name: "Seated Calf Raises", muscleGroup: "Legs", targetSets: 2, targetReps: "15/15", defaultWeight: 40 }
+    ]
+  },
+  {
+    day: "Sunday",
+    title: "REST DAY",
+    subtitle: "Recovery & Mobility",
+    focus: "Rest",
+    isRest: true,
+    exercises: []
+  }
+];
+
 // --- REPOSITORY SINGLETON STATE & SUBSCRIBERS ---
 class AscendRepository {
   constructor() {
@@ -139,7 +259,7 @@ class AscendRepository {
       challenges: STARTER_CHALLENGES,
       daily_focus: {},
       dues: [],
-      fitness: { weights: [], nutrition: [], workouts: [] }
+      fitness: { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] }
     };
   }
 
@@ -170,7 +290,7 @@ class AscendRepository {
       challenges: STARTER_CHALLENGES,
       daily_focus: {},
       dues: [],
-      fitness: { weights: [], nutrition: [], workouts: [] }
+      fitness: { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] }
     };
     this.notify();
   }
@@ -216,10 +336,13 @@ class AscendRepository {
     let finalTasks = cleanTasks;
     let finalConcepts = concepts || [];
     let finalDues = duesArr || [];
-    let finalFitness = (fitnessArr && fitnessArr.length > 0) ? fitnessArr[0] : { weights: [], nutrition: [], workouts: [] };
+    let finalFitness = (fitnessArr && fitnessArr.length > 0) ? fitnessArr[0] : { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] };
     if (!finalFitness.weights) finalFitness.weights = [];
     if (!finalFitness.nutrition) finalFitness.nutrition = [];
     if (!finalFitness.workouts) finalFitness.workouts = [];
+    if (!finalFitness.routine || finalFitness.routine.length === 0) finalFitness.routine = SOLOMON_WORKOUT_TEMPLATE;
+    if (!finalFitness.sessions) finalFitness.sessions = [];
+    if (!finalFitness.sets) finalFitness.sets = [];
 
     // For guest users without cache, populate default starter tasks locally
     if (userId === "guest" && finalTasks.length === 0) {
@@ -348,21 +471,42 @@ class AscendRepository {
       const reconciledDues = reconcileEntityList(this.state.dues || [], cloudDues || [], "id");
 
       // 8. Reconcile Fitness Logs
-      const weights = [];
-      const nutrition = [];
-      const workouts = [];
+      let weights = [];
+      let nutrition = [];
+      let workouts = [];
+      let routine = this.state.fitness.routine || SOLOMON_WORKOUT_TEMPLATE;
+      let sessions = this.state.fitness.sessions || [];
+      let sets = this.state.fitness.sets || [];
+
       (cloudFitness || []).forEach(f => {
-        if (f.deleted_at == null && f.data) {
-          if (f.log_type === "weight") weights.push({ id: f.id, ...f.data });
-          else if (f.log_type === "nutrition") nutrition.push({ id: f.id, ...f.data });
-          else if (f.log_type === "workout") workouts.push({ id: f.id, ...f.data });
+        if (f.deleted_at == null) {
+          if (f.data) {
+            if (f.log_type === "weight") weights.push({ id: f.id, ...f.data });
+            else if (f.log_type === "nutrition") nutrition.push({ id: f.id, ...f.data });
+            else if (f.log_type === "workout") workouts.push({ id: f.id, ...f.data });
+            else if (f.data.routine || f.data.sessions || f.data.sets) {
+              if (f.data.weights && f.data.weights.length > 0) weights = f.data.weights;
+              if (f.data.nutrition && f.data.nutrition.length > 0) nutrition = f.data.nutrition;
+              if (f.data.workouts && f.data.workouts.length > 0) workouts = f.data.workouts;
+              if (f.data.routine && f.data.routine.length > 0) routine = f.data.routine;
+              if (f.data.sessions && f.data.sessions.length > 0) sessions = f.data.sessions;
+              if (f.data.sets && f.data.sets.length > 0) sets = f.data.sets;
+            }
+          } else if (f.routine || f.sessions || f.sets) {
+            if (f.routine && f.routine.length > 0) routine = f.routine;
+            if (f.sessions && f.sessions.length > 0) sessions = f.sessions;
+            if (f.sets && f.sets.length > 0) sets = f.sets;
+          }
         }
       });
 
       const reconciledFitness = {
-        weights: weights.length > 0 ? weights : this.state.fitness.weights,
-        nutrition: nutrition.length > 0 ? nutrition : this.state.fitness.nutrition,
-        workouts: workouts.length > 0 ? workouts : this.state.fitness.workouts
+        weights: weights.length > 0 ? weights : (this.state.fitness.weights || []),
+        nutrition: nutrition.length > 0 ? nutrition : (this.state.fitness.nutrition || []),
+        workouts: workouts.length > 0 ? workouts : (this.state.fitness.workouts || []),
+        routine: routine,
+        sessions: sessions.length > 0 ? sessions : (this.state.fitness.sessions || []),
+        sets: sets.length > 0 ? sets : (this.state.fitness.sets || [])
       };
 
       // 9. Reconcile Daily Focus
@@ -827,13 +971,105 @@ class AscendRepository {
     this.setState({ fitness: record });
 
     if (user?.id) {
-      const dbRow = { id: `fitness_${user.id}`, user_id: user.id, ...record, updated_at: now };
+      const dbRow = { id: `fitness_${user.id}`, user_id: user.id, data: record, updated_at: now };
       try {
         await upsertUserRecords("fitness_logs", [dbRow]);
       } catch (err) {
         await this.enqueueOutbox(user.id, "fitness_logs", `fitness_${user.id}`, "upsert", [dbRow]);
       }
     }
+  }
+
+  async saveFitnessLog(logType, itemData, user) {
+    const isNew = itemData.isNew !== false && !itemData.id;
+    const now = new Date().toISOString();
+    const currentFitness = this.state.fitness || { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] };
+    
+    let key = "workouts";
+    if (logType === "weight") key = "weights";
+    else if (logType === "nutrition") key = "nutrition";
+
+    const list = [...(currentFitness[key] || [])];
+    let record;
+
+    if (isNew) {
+      record = { id: generateUUID(), ...itemData, created_at: now, updated_at: now };
+      delete record.isNew;
+      list.unshift(record);
+    } else {
+      record = { ...itemData, updated_at: now };
+      delete record.isNew;
+      const idx = list.findIndex(item => item.id === record.id);
+      if (idx !== -1) list[idx] = record;
+      else list.unshift(record);
+    }
+
+    const updatedFitness = { ...currentFitness, [key]: list };
+    await this.saveFitness(updatedFitness, user);
+  }
+
+  async deleteFitnessLog(logType, id, user) {
+    const currentFitness = this.state.fitness || { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] };
+    let key = "workouts";
+    if (logType === "weight") key = "weights";
+    else if (logType === "nutrition") key = "nutrition";
+
+    const list = (currentFitness[key] || []).filter(item => item.id !== id);
+    const updatedFitness = { ...currentFitness, [key]: list };
+    await this.saveFitness(updatedFitness, user);
+  }
+
+  async saveWorkoutSession(sessionRecord, setRecords, user) {
+    const now = new Date().toISOString();
+    const currentFitness = this.state.fitness || { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] };
+    
+    const sessionToSave = {
+      ...sessionRecord,
+      user_id: user?.id || "guest",
+      updated_at: now,
+      created_at: sessionRecord.created_at || now
+    };
+
+    const updatedSessions = [
+      sessionToSave,
+      ...(currentFitness.sessions || []).filter(s => s.id !== sessionRecord.id)
+    ];
+    
+    const existingSets = (currentFitness.sets || []).filter(s => s.session_id !== sessionRecord.id);
+    const formattedSets = setRecords.map(s => ({
+      ...s,
+      user_id: user?.id || "guest",
+      session_id: sessionRecord.id,
+      updated_at: now,
+      created_at: s.created_at || now
+    }));
+    const updatedSets = [...existingSets, ...formattedSets];
+
+    await this.saveFitness({
+      ...currentFitness,
+      sessions: updatedSessions,
+      sets: updatedSets
+    }, user);
+  }
+
+  async deleteWorkoutSession(sessionId, user) {
+    const currentFitness = this.state.fitness || { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] };
+    const updatedSessions = (currentFitness.sessions || []).filter(s => s.id !== sessionId);
+    const updatedSets = (currentFitness.sets || []).filter(s => s.session_id !== sessionId);
+
+    await this.saveFitness({
+      ...currentFitness,
+      sessions: updatedSessions,
+      sets: updatedSets
+    }, user);
+  }
+
+  async saveWorkoutRoutine(updatedRoutine, user) {
+    const currentFitness = this.state.fitness || { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] };
+    await this.saveFitness({
+      ...currentFitness,
+      routine: updatedRoutine
+    }, user);
   }
 
   async saveChallenge(challengeData, user) {

@@ -1,4 +1,5 @@
-import { repository, generateUUID, todayStr } from "./lib/repository";
+import { repository, generateUUID, todayStr, SOLOMON_WORKOUT_TEMPLATE } from "./lib/repository";
+import { calculateSetVolume, calculateSessionVolume, getExercisePRs, getPreviousExercisePerformance, calculateProgressionStatus, detectNewPRs } from "./lib/fitnessUtils";
 import { subscribeRealtimeSync, unsubscribeRealtimeSync } from "./lib/realtime";
 import { syncEngine, SYNC_STATES } from "./lib/syncEngine";
 import { supabase } from "./lib/supabase";
@@ -194,12 +195,15 @@ function App() {
   const [weightModal, setWeightModal] = useState(null);
   const [nutritionModal, setNutritionModal] = useState(null);
   const [workoutModal, setWorkoutModal] = useState(null);
+  const [exerciseHistoryModal, setExerciseHistoryModal] = useState(null);
+  const [workoutSummaryModal, setWorkoutSummaryModal] = useState(null);
+  const [editProgramModal, setEditProgramModal] = useState(null);
 
   // SubTab Navigation States
   const [questSubTab, setQuestSubTab] = useState("main");
   const [progressSubTab, setProgressSubTab] = useState("analytics");
   const [duesSubTab, setDuesSubTab] = useState("lent");
-  const [fitnessSubTab, setFitnessSubTab] = useState("weight");
+  const [fitnessSubTab, setFitnessSubTab] = useState("workouts");
 
   // Settings & Notification States
   const [geminiKey, setGeminiKey] = useState(() => typeof localStorage !== "undefined" ? localStorage.getItem("ascend_gemini_key") || "" : "");
@@ -838,7 +842,8 @@ function App() {
 
           {progressSubTab === "fitness" && (
             <FitnessView
-              fitness={local.fitness || { weights: [], nutrition: [], workouts: [] }}
+              user={user}
+              fitness={local.fitness || { weights: [], nutrition: [], workouts: [], routine: SOLOMON_WORKOUT_TEMPLATE, sessions: [], sets: [] }}
               subTab={fitnessSubTab}
               setSubTab={setFitnessSubTab}
               onOpenWeightModal={setWeightModal}
@@ -847,6 +852,9 @@ function App() {
               onDeleteNutrition={deleteNutritionEntry}
               onOpenWorkoutModal={setWorkoutModal}
               onDeleteWorkout={deleteWorkoutEntry}
+              onOpenExerciseHistory={(data) => setExerciseHistoryModal(data)}
+              onOpenEditProgram={(data) => setEditProgramModal(data)}
+              onFinishSession={(summary) => setWorkoutSummaryModal(summary)}
             />
           )}
 
@@ -941,6 +949,35 @@ function App() {
           onSave={saveWorkoutEntry}
         />
       )}
+
+      {exerciseHistoryModal && (
+        <ExerciseHistoryModal
+          modalData={exerciseHistoryModal}
+          sets={local.fitness?.sets || []}
+          sessions={local.fitness?.sessions || []}
+          onClose={() => setExerciseHistoryModal(null)}
+        />
+      )}
+
+      {workoutSummaryModal && (
+        <WorkoutSummaryModal
+          modalData={workoutSummaryModal}
+          onClose={() => setWorkoutSummaryModal(null)}
+        />
+      )}
+
+      {editProgramModal && (
+        <EditProgramModal
+          modalData={editProgramModal}
+          routine={local.fitness?.routine || SOLOMON_WORKOUT_TEMPLATE}
+          onClose={() => setEditProgramModal(null)}
+          onSave={(updatedRoutine) => {
+            repository.saveWorkoutRoutine(updatedRoutine, user);
+            setEditProgramModal(null);
+          }}
+        />
+      )}
+
 
       {dueModal && (
         <DueModal
@@ -3597,6 +3634,10 @@ class ErrorBoundary extends React.Component {
 // FITNESS & HEALTH VIEW COMPONENT
 // ==========================================
 function FitnessView({
+  user,
+  onOpenExerciseHistory,
+  onOpenEditProgram,
+  onFinishSession,
   fitness, subTab, setSubTab,
   onOpenWeightModal, onDeleteWeight,
   onOpenNutritionModal, onDeleteNutrition,
@@ -3605,6 +3646,203 @@ function FitnessView({
   const weights = fitness.weights || [];
   const nutrition = fitness.nutrition || [];
   const workouts = fitness.workouts || [];
+  const routine = fitness.routine || SOLOMON_WORKOUT_TEMPLATE;
+  const sessions = fitness.sessions || [];
+  const sets = fitness.sets || [];
+
+  // Today's Day of Week
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const todayDayName = dayNames[new Date().getDay()];
+
+  // Active workout logging state
+  const [selectedDay, setSelectedDay] = useState(todayDayName);
+  const activeDayRoutine = routine.find(r => r.day.toLowerCase() === selectedDay.toLowerCase()) || routine[0];
+
+  // Rest Timer state
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [timerActive, setTimerActive] = useState(false);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (timerActive && timerSeconds > 0) {
+      timerRef.current = setInterval(() => {
+        setTimerSeconds(prev => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            setTimerActive(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [timerActive, timerSeconds]);
+
+  const startRestTimer = (sec) => {
+    setTimerSeconds(sec);
+    setTimerActive(true);
+  };
+
+  // Local state for logging session sets
+  const [sessionSetsMap, setSessionSetsMap] = useState({});
+
+  useEffect(() => {
+    if (!activeDayRoutine || activeDayRoutine.isRest) {
+      setSessionSetsMap({});
+      return;
+    }
+
+    const initialMap = {};
+    (activeDayRoutine.exercises || []).forEach(ex => {
+      const prevSets = getPreviousExercisePerformance(sets, sessions, ex.id);
+      const targetCount = ex.targetSets || 3;
+      const targetRepsArr = (ex.targetReps || "10").split("/");
+      const defaultW = ex.defaultWeight || 0;
+
+      const exerciseSets = [];
+      for (let i = 0; i < targetCount; i++) {
+        const prevSet = prevSets[i];
+        const targetRepStr = targetRepsArr[i] || targetRepsArr[0] || "10";
+        exerciseSets.push({
+          id: generateUUID(),
+          exercise_id: ex.id,
+          exercise_name: ex.name,
+          set_number: i + 1,
+          targetReps: targetRepStr,
+          weight: prevSet ? prevSet.weight : defaultW,
+          reps: prevSet ? prevSet.reps : (parseInt(targetRepStr, 10) || 10),
+          completed: false
+        });
+      }
+      initialMap[ex.id] = exerciseSets;
+    });
+
+    setSessionSetsMap(initialMap);
+  }, [selectedDay, routine]);
+
+  const [sessionDuration, setSessionDuration] = useState(45);
+  const [sessionNotes, setSessionNotes] = useState("");
+
+  const handleUpdateSet = (exId, setIdx, field, val) => {
+    setSessionSetsMap(prev => {
+      const exSets = [...(prev[exId] || [])];
+      if (exSets[setIdx]) {
+        exSets[setIdx] = { ...exSets[setIdx], [field]: val };
+      }
+      return { ...prev, [exId]: exSets };
+    });
+  };
+
+  const handleToggleSetComplete = (exId, setIdx) => {
+    setSessionSetsMap(prev => {
+      const exSets = [...(prev[exId] || [])];
+      if (exSets[setIdx]) {
+        const nextDone = !exSets[setIdx].completed;
+        exSets[setIdx] = { ...exSets[setIdx], completed: nextDone };
+        if (nextDone) {
+          startRestTimer(60);
+        }
+      }
+      return { ...prev, [exId]: exSets };
+    });
+  };
+
+  const handleAddSetToExercise = (ex) => {
+    setSessionSetsMap(prev => {
+      const exSets = [...(prev[ex.id] || [])];
+      const nextSetNum = exSets.length + 1;
+      const lastSet = exSets[exSets.length - 1];
+      exSets.push({
+        id: generateUUID(),
+        exercise_id: ex.id,
+        exercise_name: ex.name,
+        set_number: nextSetNum,
+        targetReps: lastSet ? lastSet.targetReps : "10",
+        weight: lastSet ? lastSet.weight : ex.defaultWeight || 0,
+        reps: lastSet ? lastSet.reps : 10,
+        completed: false
+      });
+      return { ...prev, [ex.id]: exSets };
+    });
+  };
+
+  const handleRemoveSetFromExercise = (exId, setIdx) => {
+    setSessionSetsMap(prev => {
+      const exSets = (prev[exId] || []).filter((_, idx) => idx !== setIdx);
+      const reindexed = exSets.map((s, idx) => ({ ...s, set_number: idx + 1 }));
+      return { ...prev, [exId]: reindexed };
+    });
+  };
+
+  const handleFinishWorkout = async () => {
+    const allLoggedSets = [];
+    Object.values(sessionSetsMap).forEach(exSets => {
+      exSets.forEach(s => {
+        if (s.completed) {
+          allLoggedSets.push(s);
+        }
+      });
+    });
+
+    if (allLoggedSets.length === 0) {
+      alert("Please check off at least one completed set before finishing your workout session.");
+      return;
+    }
+
+    const totalVol = calculateSessionVolume(allLoggedSets);
+    const sessionId = generateUUID();
+    const newSession = {
+      id: sessionId,
+      date: todayStr(),
+      day_name: activeDayRoutine.day,
+      split_title: activeDayRoutine.title,
+      duration_minutes: parseInt(sessionDuration, 10) || 45,
+      total_volume: totalVol,
+      notes: sessionNotes,
+      completed_sets_count: allLoggedSets.length,
+      created_at: new Date().toISOString()
+    };
+
+    const prog = calculateProgressionStatus(sessions, newSession);
+    const newPRs = detectNewPRs(sets, allLoggedSets, sessionId);
+
+    await repository.saveWorkoutSession(newSession, allLoggedSets, user);
+
+    if (onFinishSession) {
+      onFinishSession({
+        session: newSession,
+        progression: prog,
+        newPRs: newPRs,
+        totalSets: allLoggedSets.length
+      });
+    }
+
+    setSessionNotes("");
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    if (confirm("Delete this completed workout session and its logged sets?")) {
+      await repository.deleteWorkoutSession(sessionId, user);
+    }
+  };
+
+  const handleResetProgramToDefault = async () => {
+    if (confirm("Reset workout program to default 6-Day Solomon Split?")) {
+      await repository.saveWorkoutRoutine(SOLOMON_WORKOUT_TEMPLATE, user);
+    }
+  };
+
+  // Workout Summary metrics
+  const totalVolumeAllTime = sessions.reduce((acc, s) => acc + (s.total_volume || 0), 0);
+  const thisWeekSessions = sessions.filter(s => {
+    if (!s.date) return false;
+    const diffDays = (new Date() - new Date(s.date)) / (1000 * 3600 * 24);
+    return diffDays <= 7;
+  });
+  const thisWeekVolume = thisWeekSessions.reduce((acc, s) => acc + (s.total_volume || 0), 0);
 
   // Weight statistics calculation
   const sortedWeights = [...weights].sort((a, b) => (a.date > b.date ? 1 : -1));
